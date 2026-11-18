@@ -740,7 +740,7 @@ export default function ConceptPlanner({
         </div>
       </section>
 
-      <section className="border border-dashed border-line bg-surface/60 p-4 sm:p-6">
+      <section className="border border-ink bg-surface p-4 sm:p-6">
         <p className="font-mono text-xs uppercase tracking-widest text-accent">
           Next stage
         </p>
@@ -748,14 +748,15 @@ export default function ConceptPlanner({
           Floor plans
         </h2>
         <p className="mt-1 text-sm text-muted">
-          Coming soon: turn this concept into a floor plan with walls, doors,
-          windows and furniture. Save your project file now so it is ready.
+          Turn this concept into a floor plan with walls, doors, windows and
+          furniture. In the studio, press &ldquo;Use my site study&rdquo; to
+          bring in your site size and north direction.
         </p>
         <Link
-          href="/#studio-tools"
-          className="mt-4 inline-block border border-ink px-5 py-2.5 text-sm font-medium hover:border-accent hover:text-accent"
+          href="/studio/plan"
+          className="mt-4 inline-block bg-accent px-5 py-2.5 text-sm font-medium text-accent-ink hover:opacity-90"
         >
-          Back to all tools →
+          Next: open the Floor Plan Studio →
         </Link>
       </section>
 

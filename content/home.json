@@ -3,7 +3,7 @@
   "intro": "Quick studio tools, a growing precedent library, and practical help for juries and portfolios. Free, open, and made by students.",
   "flow": [
     { "title": "Concept", "href": "/tools/concept-planner", "status": "live" },
-    { "title": "Floor plans", "status": "soon" },
+    { "title": "Floor plans", "href": "/studio/plan", "status": "live" },
     { "title": "Elevations", "status": "soon" },
     { "title": "Sections", "status": "soon" },
     { "title": "3D views", "status": "soon" },
@@ -35,8 +35,9 @@
         },
         {
           "title": "Floor Plan Studio",
-          "description": "Draw walls, doors, windows and columns at real dimensions.",
-          "status": "soon"
+          "description": "Draw accurate plans with walls, doors, windows, furniture, dimensions and room areas. Export PNG and DXF.",
+          "href": "/studio/plan",
+          "status": "live"
         }
       ]
     },
