@@ -67,9 +67,17 @@ export type Elevation = {
   depthSpan: number; // how deep the building is, front to back, from this side
 };
 
+/** The direction the viewer looks in for each view. */
+export const lookOf = (view: ViewId): Pt => LOOK[view];
+
+/**
+ * `beyond` is used for sections: only what lies further away than that
+ * distance is included (the part of the building behind the cut).
+ */
 export function buildElevation(
   plan: { entities?: unknown; floors?: unknown },
   view: ViewId,
+  beyond?: number,
 ): Elevation {
   const look = LOOK[view];
   const right: Pt = [-look[1], look[0]]; // the viewer's right-hand direction
@@ -105,6 +113,7 @@ export function buildElevation(
         const n = mul(perp(unit(a, b)), wall.t / 2);
         corners = [add(a, n), add(b, n), sub(b, n), sub(a, n)];
       }
+      if (beyond !== undefined && Math.max(...corners.map(away)) <= beyond + 1) continue;
       const us = corners.map(across);
       pieces.push({
         id: `${wall.id}-${i}`,
@@ -117,7 +126,7 @@ export function buildElevation(
         curved: shape.curved,
       });
     }
-    if (shape.curved) {
+    if (shape.curved && pieces.length > 0) {
       const leftmost = pieces.reduce((best, piece) => (piece.u1 < best.u1 ? piece : best));
       const rightmost = pieces.reduce((best, piece) => (piece.u2 > best.u2 ? piece : best));
       leftmost.edgeLeft = true;
@@ -136,7 +145,9 @@ export function buildElevation(
       if (Math.abs(along[0] * look[0] + along[1] * look[1]) > 0.75) continue;
       const a = across(sub(spot.p, mul(along, opening.width / 2)));
       const b = across(add(spot.p, mul(along, opening.width / 2)));
-      const piece = pieces[Math.min(count - 1, Math.floor((opening.pos / length) * count))];
+      const index = Math.min(count - 1, Math.floor((opening.pos / length) * count));
+      const piece = pieces.find((item) => item.id === `${wall.id}-${index}`);
+      if (!piece) continue; // that part of the wall is not in view
       piece.openings.push({
         id: opening.id,
         kind: opening.kind,
@@ -154,6 +165,7 @@ export function buildElevation(
 
   const trees: TreeFace[] = entities
     .filter((e) => e.kind === "tree")
+    .filter((e) => beyond === undefined || away((e as Extract<Entity, { kind: "tree" }>).p) > beyond)
     .map((tree) => {
       const t = tree as Extract<Entity, { kind: "tree" }>;
       return { id: t.id, depth: away(t.p), u: across(t.p), r: t.r };

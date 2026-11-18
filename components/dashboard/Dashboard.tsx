@@ -101,7 +101,12 @@ export default function Dashboard() {
       note: plan.walls.length > 0 ? "Drawn from your plans" : "Needs a plan first",
       href: "/elevations",
     },
-    { title: "Sections", state: "planned", note: "In progress", href: "" },
+    {
+      title: "Sections",
+      state: plan.walls.length > 0 ? "active" : "todo",
+      note: plan.walls.length > 0 ? "Cut from your plans" : "Needs a plan first",
+      href: "/sections",
+    },
     { title: "3D views", state: "planned", note: "In progress", href: "" },
     { title: "Portfolio", state: "planned", note: "In progress", href: "" },
   ];

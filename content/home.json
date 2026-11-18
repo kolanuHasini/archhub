@@ -56,8 +56,9 @@
     },
     {
       "title": "Sections",
-      "status": "soon",
-      "description": "Cut a line through the plan and see inside."
+      "href": "/sections",
+      "status": "live",
+      "description": "Cut anywhere through the plan, with slabs, plinth and footings."
     },
     {
       "title": "3D views",

@@ -177,6 +177,22 @@ export type Settings = {
   ghost: boolean; // show the floor below faintly, for lining walls up
   roof: Roof; // shown in elevations
   facade: string; // facade material shown in elevations
+  structure: Structure; // sizes used when drawing sections
+};
+
+// The parts of the building below the floor, as drawn in sections.
+export type Structure = {
+  plinth: number; // height of the ground floor above the natural ground
+  slab: number; // thickness of each floor slab
+  footingDepth: number; // how far below ground the footing sits
+  footingWidth: number; // width of the footing under each wall
+};
+
+export const DEFAULT_STRUCTURE: Structure = {
+  plinth: 450,
+  slab: 150,
+  footingDepth: 1200,
+  footingWidth: 900,
 };
 
 export type Roof = {
@@ -253,6 +269,7 @@ export const DEFAULT_SETTINGS: Settings = {
   ghost: true,
   roof: { type: "flat", pitch: 25, overhang: 450, parapet: 600, turned: false },
   facade: "plaster",
+  structure: { plinth: 450, slab: 150, footingDepth: 1200, footingWidth: 900 },
 };
 
 export const EMPTY_PLAN: PlanDoc = {
