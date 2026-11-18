@@ -1,0 +1,113 @@
+{
+  "tagline": "A free toolkit for architecture students",
+  "intro": "Quick studio tools, a growing precedent library, and practical help for juries and portfolios. Free, open, and made by students.",
+  "flow": [
+    { "title": "Concept", "href": "/tools/concept-planner", "status": "live" },
+    { "title": "Floor plans", "status": "soon" },
+    { "title": "Elevations", "status": "soon" },
+    { "title": "Sections", "status": "soon" },
+    { "title": "3D views", "status": "soon" },
+    { "title": "Portfolio", "status": "soon" }
+  ],
+  "sections": [
+    {
+      "id": "studio-tools",
+      "number": "01",
+      "title": "Studio Tools",
+      "description": "Small calculators and helpers for everyday studio work.",
+      "items": [
+        {
+          "title": "Concept Planner",
+          "description": "Go from brief, site and climate to a concept sketch and statement in five guided steps.",
+          "href": "/tools/concept-planner",
+          "status": "live"
+        },
+        {
+          "title": "Scale Converter",
+          "description": "Convert between real size and drawing size at 1:50, 1:100, 1:200, 1:500 or any custom scale.",
+          "href": "/tools/scale-converter",
+          "status": "live"
+        },
+        {
+          "title": "Area Calculator",
+          "description": "Work out room and site areas in square metres and square feet.",
+          "status": "soon"
+        },
+        {
+          "title": "Floor Plan Studio",
+          "description": "Draw walls, doors, windows and columns at real dimensions.",
+          "status": "soon"
+        }
+      ]
+    },
+    {
+      "id": "precedents",
+      "number": "02",
+      "title": "Precedent Library",
+      "description": "Case studies of notable buildings, organised by type, climate and architect.",
+      "items": [
+        {
+          "title": "Housing",
+          "description": "Apartments, row houses and community housing projects.",
+          "status": "soon"
+        },
+        {
+          "title": "Public Buildings",
+          "description": "Libraries, museums, schools and civic spaces.",
+          "status": "soon"
+        },
+        {
+          "title": "Climate-Responsive Design",
+          "description": "Projects that respond well to sun, wind and rain.",
+          "status": "soon"
+        }
+      ]
+    },
+    {
+      "id": "jury-portfolio",
+      "number": "03",
+      "title": "Jury & Portfolio Help",
+      "description": "Guidance for presenting your work with confidence.",
+      "items": [
+        {
+          "title": "Jury Preparation Checklist",
+          "description": "What to pin up, what to say, and what to expect.",
+          "status": "soon"
+        },
+        {
+          "title": "Sheet Layout Guide",
+          "description": "Simple rules for clear, readable presentation sheets.",
+          "status": "soon"
+        },
+        {
+          "title": "Portfolio Basics",
+          "description": "How to choose, order and present your best projects.",
+          "status": "soon"
+        }
+      ]
+    },
+    {
+      "id": "resources",
+      "number": "04",
+      "title": "Resources",
+      "description": "Standards, references and free software worth knowing.",
+      "items": [
+        {
+          "title": "Standard Dimensions",
+          "description": "Common furniture, door, stair and parking sizes.",
+          "status": "soon"
+        },
+        {
+          "title": "Free Software",
+          "description": "Free and student-licensed tools for drawing and modelling.",
+          "status": "soon"
+        },
+        {
+          "title": "Reading List",
+          "description": "Books and websites recommended by students and teachers.",
+          "status": "soon"
+        }
+      ]
+    }
+  ]
+}

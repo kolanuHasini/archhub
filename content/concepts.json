@@ -1,0 +1,161 @@
+{
+  "projectTypes": [
+    "House",
+    "Housing",
+    "School",
+    "Library",
+    "Museum or gallery",
+    "Community centre",
+    "Cafe or restaurant",
+    "Office",
+    "Interior",
+    "Other"
+  ],
+  "climates": [
+    {
+      "id": "hot-dry",
+      "label": "Hot and dry",
+      "strategies": [
+        "thick, heavy walls that slow down the heat",
+        "small, shaded openings on the sunny sides",
+        "a shaded courtyard that cools the air",
+        "compact planning so buildings shade each other",
+        "water and planting for evaporative cooling"
+      ]
+    },
+    {
+      "id": "warm-humid",
+      "label": "Warm and humid",
+      "strategies": [
+        "cross ventilation through thin, open plans",
+        "deep roof overhangs and verandahs for shade and rain",
+        "raised floors and high ceilings to keep air moving",
+        "lightweight walls that do not store heat",
+        "shaded outdoor rooms for everyday living"
+      ]
+    },
+    {
+      "id": "composite",
+      "label": "Composite (hot summers, monsoon, cool winters)",
+      "strategies": [
+        "a courtyard that works differently in each season",
+        "shading that blocks summer sun but lets in winter sun",
+        "openable walls for monsoon breezes",
+        "thermal mass on the hottest sides",
+        "terraces and verandahs as seasonal living spaces"
+      ]
+    },
+    {
+      "id": "temperate",
+      "label": "Temperate (mild)",
+      "strategies": [
+        "generous openings towards the winter sun",
+        "adjustable shading for summer",
+        "natural ventilation for most of the year",
+        "strong connections between inside and outside",
+        "good insulation to keep comfort steady"
+      ]
+    },
+    {
+      "id": "cold",
+      "label": "Cold",
+      "strategies": [
+        "a compact form that loses less heat",
+        "large openings facing the sun, small ones facing away",
+        "thick insulation and airtight construction",
+        "entrance lobbies that keep cold air out",
+        "sunspaces that collect warmth"
+      ]
+    }
+  ],
+  "drivers": [
+    {
+      "id": "light",
+      "title": "Light and shadow",
+      "question": "How should daylight feel in the most important space?",
+      "moves": [
+        "Shape the roof to bring light in from above",
+        "Use screens or louvres to make patterned shadow",
+        "Keep one space deliberately dim to make the next feel bright"
+      ],
+      "diagrams": ["Sun path over the site", "Section showing how light enters"]
+    },
+    {
+      "id": "courtyard",
+      "title": "Courtyard and void",
+      "question": "What happens in the empty space at the heart of the building?",
+      "moves": [
+        "Organise the rooms around one open centre",
+        "Carve voids out of a solid block",
+        "Link several small courts instead of one large one"
+      ],
+      "diagrams": ["Solid and void diagram", "Courtyard section with air movement"]
+    },
+    {
+      "id": "movement",
+      "title": "Movement and journey",
+      "question": "What should a visitor see and feel between the entrance and the main space?",
+      "moves": [
+        "Design a route that reveals the building little by little",
+        "Make the stair or ramp the main event",
+        "Separate fast routes from slow, wandering ones"
+      ],
+      "diagrams": ["Circulation diagram", "Sequence of views along the route"]
+    },
+    {
+      "id": "context",
+      "title": "Context and street",
+      "question": "What does the neighbourhood already do well that the design can continue?",
+      "moves": [
+        "Match the heights and rhythm of the neighbouring buildings",
+        "Give something back to the street: a seat, shade, a threshold",
+        "Frame one important view of the surroundings"
+      ],
+      "diagrams": ["Figure-ground plan of the area", "Street elevation with neighbours"]
+    },
+    {
+      "id": "nature",
+      "title": "Nature and landscape",
+      "question": "Which part of the site is too good to build on?",
+      "moves": [
+        "Keep existing trees and plan around them",
+        "Let the ground slope shape the floor levels",
+        "Blur the edge between garden and room"
+      ],
+      "diagrams": ["Site analysis with trees, slope and water", "Section through building and landscape"]
+    },
+    {
+      "id": "community",
+      "title": "Community and gathering",
+      "question": "Where do people meet by accident, and where on purpose?",
+      "moves": [
+        "Place one shared space where all routes cross",
+        "Make steps, edges and thresholds wide enough to sit on",
+        "Arrange spaces from most public to most private"
+      ],
+      "diagrams": ["Public to private gradient", "Bubble diagram of activities"]
+    },
+    {
+      "id": "material",
+      "title": "Material and craft",
+      "question": "Which one material tells the story of this place?",
+      "moves": [
+        "Use a local material and show how it is put together",
+        "Limit the palette to two or three materials",
+        "Let the structure be visible instead of hidden"
+      ],
+      "diagrams": ["Material palette sheet", "Detail sketch of a key junction"]
+    },
+    {
+      "id": "flexibility",
+      "title": "Flexibility and change",
+      "question": "How might this building be used differently in ten years?",
+      "moves": [
+        "Use a regular grid that allows rooms to be rearranged",
+        "Design one large space that can be divided",
+        "Plan for the building to grow in stages"
+      ],
+      "diagrams": ["Structural grid diagram", "Day and night, or now and later, use diagrams"]
+    }
+  ]
+}
