@@ -74,7 +74,28 @@ export type Line = {
   b: Pt;
 };
 
-export type Entity = Wall | Opening | Dim | Room | Tree | Furn | Label | Line;
+// A picture placed under the drawing to trace over: a site map, a survey,
+// a scanned plan or a photo of a paper sketch.
+export type Underlay = {
+  id: string;
+  kind: "image";
+  p: Pt; // top-left corner
+  w: number; // real width the picture covers
+  h: number;
+  href: string;
+  opacity: number; // 0 to 1
+};
+
+export type Entity =
+  | Wall
+  | Opening
+  | Dim
+  | Room
+  | Tree
+  | Furn
+  | Label
+  | Line
+  | Underlay;
 
 // The plot of land. Its top-left corner is at 0,0 and the road is along the
 // bottom edge. `north` is the direction of north on screen, in degrees
@@ -128,6 +149,7 @@ export const EMPTY_PLAN: PlanDoc = {
 };
 
 export const LAYERS: { id: string; name: string }[] = [
+  { id: "underlay", name: "Traced pictures" },
   { id: "site", name: "Site boundary" },
   { id: "rooms", name: "Rooms and floors" },
   { id: "walls", name: "Walls" },
@@ -159,6 +181,8 @@ export function layerOf(entity: Entity): string {
       return "text";
     case "line":
       return "lines";
+    case "image":
+      return "underlay";
   }
 }
 

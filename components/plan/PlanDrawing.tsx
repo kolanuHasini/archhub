@@ -27,6 +27,7 @@ import type {
   Pt,
   Room,
   Tree,
+  Underlay,
   Unit,
   Wall,
 } from "@/lib/plan/types";
@@ -517,7 +518,13 @@ function SheetMarks({
 
 // --- The whole drawing -------------------------------------------------------------
 
-export default function PlanDrawing({ doc }: { doc: PlanDoc }) {
+export default function PlanDrawing({
+  doc,
+  activeId = null,
+}: {
+  doc: PlanDoc;
+  activeId?: string | null; // the selected object, if any
+}) {
   const { settings, site } = doc;
   const base = getStyle(settings.style);
   const style: PlanStyle = settings.wallColor
@@ -544,6 +551,24 @@ export default function PlanDrawing({ doc }: { doc: PlanDoc }) {
       <defs>
         <FinishPatterns style={style} />
       </defs>
+
+      {/* Traced pictures sit at the very back. They can only be clicked while
+          selected, so they never get in the way of drawing. */}
+      {show("underlay") &&
+        (of("image") as Underlay[]).map((image) => (
+          <image
+            key={image.id}
+            data-id={image.id}
+            href={image.href}
+            x={image.p[0]}
+            y={image.p[1]}
+            width={image.w}
+            height={image.h}
+            opacity={image.opacity}
+            preserveAspectRatio="none"
+            pointerEvents={image.id === activeId ? "auto" : "none"}
+          />
+        ))}
 
       {site && show("site") && (
         <g fontFamily={FONT}>

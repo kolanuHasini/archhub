@@ -153,6 +153,7 @@ export function moveEntity(entity: Entity, dx: number, dy: number): Entity {
     case "tree":
     case "furn":
     case "text":
+    case "image":
       return { ...entity, p: shift(entity.p) };
     default:
       return entity; // doors and windows slide along their wall instead
@@ -200,6 +201,10 @@ export function extents(doc: PlanDoc): Box {
         break;
       case "text":
         take(entity.p, 500);
+        break;
+      case "image":
+        take(entity.p);
+        take([entity.p[0] + entity.w, entity.p[1] + entity.h]);
         break;
     }
   }

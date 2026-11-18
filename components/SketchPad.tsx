@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { downloadBlob } from "@/lib/download";
+import { loadPhoto } from "@/lib/image";
 import { isSavedInBrowser, useSavedState } from "@/lib/useSavedState";
 
 // ---------------------------------------------------------------------------
@@ -323,39 +324,6 @@ const toolButton = (active: boolean) =>
 const actionButton =
   "border border-ink px-3 py-1.5 font-mono text-xs hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:border-line disabled:text-muted disabled:opacity-60";
 
-// Reads a photo and shrinks it so it does not fill up the browser's storage.
-function loadPhoto(
-  file: File,
-): Promise<{ href: string; width: number; height: number }> {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const image = new Image();
-    image.onload = () => {
-      URL.revokeObjectURL(url);
-      const shrink = Math.min(
-        1,
-        PHOTO_MAX_PIXELS / Math.max(image.naturalWidth, image.naturalHeight),
-      );
-      const width = Math.max(1, Math.round(image.naturalWidth * shrink));
-      const height = Math.max(1, Math.round(image.naturalHeight * shrink));
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      const context = canvas.getContext("2d");
-      if (!context) return reject(new Error("no canvas"));
-      context.fillStyle = "#ffffff";
-      context.fillRect(0, 0, width, height);
-      context.drawImage(image, 0, 0, width, height);
-      resolve({ href: canvas.toDataURL("image/jpeg", 0.75), width, height });
-    };
-    image.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error("not an image"));
-    };
-    image.src = url;
-  });
-}
-
 export default function SketchPad({
   storageKey,
   fileName = "concept-sketch",
@@ -624,7 +592,7 @@ export default function SketchPad({
     event.target.value = ""; // allow picking the same photo again later
     if (!file) return;
     try {
-      const photo = await loadPhoto(file);
+      const photo = await loadPhoto(file, PHOTO_MAX_PIXELS);
       // Fit the photo inside the sheet, with a margin, and centre it.
       const fit = Math.min(
         (SHEET_WIDTH * 0.8) / photo.width,

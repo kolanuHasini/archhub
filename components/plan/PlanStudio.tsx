@@ -56,7 +56,8 @@ import {
   type Site,
   type Wall,
 } from "@/lib/plan/types";
-import { useSavedState } from "@/lib/useSavedState";
+import { loadPhoto } from "@/lib/image";
+import { isSavedInBrowser, useSavedState } from "@/lib/useSavedState";
 
 // ---------------------------------------------------------------------------
 // The Floor Plan Studio workspace: tools on the left, the drawing in the
@@ -215,6 +216,7 @@ export default function PlanStudio() {
   const holderRef = useRef<HTMLDivElement>(null);
   const openRef = useRef<HTMLInputElement>(null);
   const dxfRef = useRef<HTMLInputElement>(null);
+  const traceRef = useRef<HTMLInputElement>(null);
   const dragRef = useRef<Drag | null>(null);
   const viewRef = useRef<View>({ cx: 0, cy: 0, zoom: 0.05 });
 
@@ -753,6 +755,46 @@ export default function PlanStudio() {
     );
   }
 
+  // Places a picture (site map, survey, scanned plan) under the drawing.
+  async function addTraceImage(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    try {
+      const photo = await loadPhoto(file, 1600);
+      // Start at the site's width if there is one, otherwise 20 metres wide.
+      const w = doc.site ? doc.site.w : 20000;
+      const h = Math.round((w * photo.height) / photo.width);
+      const image: Entity = {
+        id: newId(),
+        kind: "image",
+        p: doc.site ? [0, 0] : [Math.round(v.cx - w / 2), Math.round(v.cy - h / 2)],
+        w,
+        h,
+        href: photo.href,
+        opacity: 0.6,
+      };
+      commit([...doc.entities, image]);
+      setToolState("select");
+      setSelectedId(image.id);
+      setView(null);
+      setNotice(
+        isSavedInBrowser(STORAGE_KEY)
+          ? "Picture added. Set its real width on the right so it is at true scale."
+          : "Picture added, but the browser's saving space is full. Use Save to keep your work.",
+      );
+    } catch {
+      window.alert("That file could not be opened as a picture. Choose a JPG or PNG. (For a PDF, take a screenshot of the page first.)");
+    }
+  }
+
+  function duplicateSelected() {
+    if (!selected || selected.kind === "door" || selected.kind === "window") return;
+    const copy = { ...moveEntity(selected, 500, 500), id: newId() };
+    commit([...doc.entities, copy]);
+    setSelectedId(copy.id);
+  }
+
   function exportImage(kind: "png" | "svg") {
     const svg = svgRef.current;
     if (!svg) return;
@@ -929,6 +971,10 @@ export default function PlanStudio() {
           {...mark}
         />
       );
+    } else if (selected.kind === "image") {
+      selectionMark = (
+        <rect x={selected.p[0]} y={selected.p[1]} width={selected.w} height={selected.h} {...mark} />
+      );
     } else {
       const wall = walls.find((w) => w.id === selected.wallId);
       if (wall) {
@@ -957,11 +1003,43 @@ export default function PlanStudio() {
   function selectionPanel(entity: Entity) {
     const actions = (
       <div className="flex flex-wrap gap-1.5 pt-1">
+        {entity.kind !== "door" && entity.kind !== "window" && (
+          <Btn onClick={duplicateSelected}>Duplicate</Btn>
+        )}
         <Btn onClick={deleteSelected} danger>
           Delete
         </Btn>
       </div>
     );
+    if (entity.kind === "image") {
+      return (
+        <Section title="Traced picture">
+          <Row label="Real width">
+            <NumInput
+              value={entity.w}
+              min={100}
+              suffix="mm"
+              onCommit={(w) =>
+                updateEntity({ ...entity, w, h: Math.round((w * entity.h) / entity.w) })
+              }
+            />
+          </Row>
+          <Row label="Opacity">
+            <NumInput
+              value={Math.round(entity.opacity * 100)}
+              min={5}
+              suffix="%"
+              onCommit={(value) => updateEntity({ ...entity, opacity: Math.min(value, 100) / 100 })}
+            />
+          </Row>
+          <p className="text-[#8b9099]">
+            To bring it to true scale: measure something you know on the picture (for example the site
+            width) and set the real width so they match. Drag to position it, then draw over it.
+          </p>
+          {actions}
+        </Section>
+      );
+    }
     if (entity.kind === "wall") {
       const length = dist(entity.a, entity.b);
       return (
@@ -1125,6 +1203,9 @@ export default function PlanStudio() {
         <Btn onClick={() => dxfRef.current?.click()} title="Bring in lines from a DXF file (AutoCAD: Save As DXF)">
           Import DXF
         </Btn>
+        <Btn onClick={() => traceRef.current?.click()} title="Place a site map, survey or scanned plan under the drawing to trace over">
+          Trace image
+        </Btn>
         <span className="shrink-0 pl-1 text-[#8b9099]">Export:</span>
         <Btn onClick={() => exportImage("png")}>PNG</Btn>
         <Btn onClick={() => exportImage("svg")}>SVG</Btn>
@@ -1154,6 +1235,7 @@ export default function PlanStudio() {
         </Btn>
         <input ref={openRef} type="file" accept=".json,application/json" onChange={openProject} className="hidden" aria-label="Open plan file" />
         <input ref={dxfRef} type="file" accept=".dxf" onChange={importDxfFile} className="hidden" aria-label="Import DXF file" />
+        <input ref={traceRef} type="file" accept="image/*" onChange={addTraceImage} className="hidden" aria-label="Add image to trace" />
       </header>
 
       <div className="flex min-h-0 flex-1">
@@ -1207,7 +1289,7 @@ export default function PlanStudio() {
               {gridLines}
             </g>
 
-            <PlanDrawing doc={shown} />
+            <PlanDrawing doc={shown} activeId={selectedId} />
 
             {/* Tool marks: never part of an exported drawing. */}
             <g data-export="skip" fontFamily="Arial, Helvetica, sans-serif">
@@ -1519,6 +1601,28 @@ export default function PlanStudio() {
                 </>
               )}
             </Section>
+
+            {doc.entities.some((e) => e.kind === "image") && (
+              <Section title="Traced pictures">
+                {doc.entities
+                  .filter((e) => e.kind === "image")
+                  .map((image, index) => (
+                    <Btn
+                      key={image.id}
+                      active={selectedId === image.id}
+                      onClick={() => {
+                        setToolState("select");
+                        setSelectedId(image.id);
+                      }}
+                    >
+                      Select picture {index + 1}
+                    </Btn>
+                  ))}
+                <p className="text-[#8b9099]">
+                  A picture can only be moved while it is selected here, so it stays out of the way.
+                </p>
+              </Section>
+            )}
 
             <Section title="Drawing">
               <Row label="Scale (lettering size)">
