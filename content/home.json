@@ -62,8 +62,9 @@
     },
     {
       "title": "3D views",
-      "status": "soon",
-      "description": "Orbit the model, set materials and sun."
+      "href": "/view3d",
+      "status": "live",
+      "description": "Orbit the outside or walk through the inside, with sun and shadows."
     },
     {
       "title": "Portfolio",
