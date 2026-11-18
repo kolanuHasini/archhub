@@ -315,6 +315,38 @@ const PAINTERS: Record<string, { metres: number; rough: number; bump: number; pa
   },
 };
 
+// Photographed materials (public domain, from polyhaven.com), kept in
+// public/assets/3d/tex. Each has three pictures: colour, surface relief
+// ("normal") and roughness. `metres` is the real width one picture covers.
+// Materials not listed here use the painted versions above.
+const PHOTOS: Record<string, number> = {
+  brick: 1,
+  concrete: 3,
+  plaster: 2,
+  timber: 1.8,
+  woodFloor: 1.7,
+  roofTile: 3.5,
+  stone: 2,
+};
+
+function photoMaterial(name: string): THREE.MeshStandardMaterial {
+  const loader = new THREE.TextureLoader();
+  const load = (kind: string, colour: boolean) => {
+    const texture = loader.load(`/assets/3d/tex/${name}_${kind}.jpg`);
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(1 / PHOTOS[name], 1 / PHOTOS[name]);
+    texture.anisotropy = 8;
+    if (colour) texture.colorSpace = THREE.SRGBColorSpace;
+    return texture;
+  };
+  return new THREE.MeshStandardMaterial({
+    map: load("diff", true),
+    normalMap: load("nor", false),
+    roughnessMap: load("rough", false),
+    roughness: 1,
+  });
+}
+
 const cache = new Map<string, THREE.MeshStandardMaterial>();
 
 /** A realistic material by name. Made once, then reused. */
@@ -322,6 +354,11 @@ export function material(name: string): THREE.MeshStandardMaterial {
   const known = PAINTERS[name] ? name : "plaster";
   const ready = cache.get(known);
   if (ready) return ready;
+  if (PHOTOS[known]) {
+    const photo = photoMaterial(known);
+    cache.set(known, photo);
+    return photo;
+  }
   const recipe = PAINTERS[known];
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = SIZE;

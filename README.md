@@ -52,3 +52,7 @@ npm run dev
 ```
 
 Then open http://localhost:3000 in your browser.
+
+## Credits
+
+The photographed materials and the sky in the 3D view (in `public/assets/3d`) are from [Poly Haven](https://polyhaven.com), released into the public domain (CC0): red_brick_03, concrete_wall_003, plastered_wall, weathered_brown_planks, laminate_floor_02, ceramic_roof_01, medieval_blocks_03 and the sky kloofendal_48d_partly_cloudy_puresky.

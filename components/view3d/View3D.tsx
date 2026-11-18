@@ -6,6 +6,7 @@ import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
 import { OBJExporter } from "three/examples/jsm/exporters/OBJExporter.js";
+import { RGBELoader } from "three/examples/jsm/loaders/RGBELoader.js";
 import { Sky } from "three/examples/jsm/objects/Sky.js";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { GTAOPass } from "three/examples/jsm/postprocessing/GTAOPass.js";
@@ -41,6 +42,7 @@ type Stage = {
   pmrem: THREE.PMREMGenerator;
   composer: EffectComposer | null; // adds the soft shading in corners
   soft: boolean;
+  photoSky: boolean; // true once the photographed sky has loaded
   model: ModelInfo | null;
   walking: boolean;
   framed: boolean; // true once the camera has been pointed at the building
@@ -94,7 +96,7 @@ export default function View3D() {
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     // Film-like handling of bright and dark, as in a photograph.
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 0.72;
+    renderer.toneMappingExposure = 0.95;
     holder.appendChild(renderer.domElement);
     renderer.domElement.style.display = "block";
     renderer.domElement.style.touchAction = "none";
@@ -139,10 +141,24 @@ export default function View3D() {
     }
 
     const stage: Stage = {
-      renderer, scene, camera, controls, sun, sky, pmrem, composer, soft: true,
+      renderer, scene, camera, controls, sun, sky, pmrem, composer, soft: true, photoSky: false,
       model: null, walking: false, framed: false, yaw: 0, pitch: 0, keys: new Set(),
     };
     stageRef.current = stage;
+
+    // A photographed sky (public domain, polyhaven.com) lights the scene and
+    // shows in the glass. Until it has loaded, the calculated sky is used.
+    new RGBELoader().load("/assets/3d/sky.hdr", (picture) => {
+      if (stageRef.current !== stage) return;
+      picture.mapping = THREE.EquirectangularReflectionMapping;
+      scene.background = picture;
+      scene.backgroundBlurriness = 0.02;
+      scene.environment?.dispose();
+      scene.environment = pmrem.fromEquirectangular(picture).texture;
+      scene.environmentIntensity = 0.95;
+      scene.remove(sky);
+      stage.photoSky = true;
+    });
 
     const resize = () => {
       const width = holder.clientWidth || 800;
@@ -267,6 +283,12 @@ export default function View3D() {
     // Low sun is warmer and weaker, like early morning or evening.
     stage.sun.color.set(sunHeight < 25 ? "#ffd2a1" : "#fff1dc");
     stage.sun.intensity = 1.6 + Math.sin(up) * 2.2;
+
+    if (stage.photoSky) {
+      // The photographed sky is turned so its brightest side follows the sun.
+      stage.scene.backgroundRotation.y = stage.scene.environmentRotation.y = -compass;
+      return;
+    }
 
     // Put the sun in the sky, and let the sky light the scene and show in the glass.
     const towards = stage.sun.position.clone().sub(centre).normalize();
