@@ -195,6 +195,10 @@ export const FINISH_COLOURS: Record<string, { fill: string; line: string }> = {
   wood: { fill: "#dcbd8f", line: "#b98f5c" },
   stone: { fill: "#dedad0", line: "#b9b3a5" },
   concrete: { fill: "#e3e1dc", line: "#c9c6bf" },
+  marble: { fill: "#f4f2ee", line: "#cfcac2" },
+  brick: { fill: "#c98566", line: "#a5644a" },
+  deck: { fill: "#c9a273", line: "#9d7748" },
+  gravel: { fill: "#e4dfd3", line: "#aaa392" },
   grass: { fill: "#cfdcb6", line: "#9db384" },
   water: { fill: "#cfe4ec", line: "#8fbccd" },
 };

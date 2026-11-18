@@ -1,5 +1,5 @@
 import { getFurniture } from "./furniture";
-import { add, dist, mul, perp, sub, unit, wallCorners } from "./geometry";
+import { add, circleThrough, dist, mul, perp, sub, unit, wallCorners } from "./geometry";
 import {
   newId,
   type Entity,
@@ -159,6 +159,35 @@ export function exportDxf(doc: PlanDoc): string {
       case "line":
         line("LINES", entity.a, entity.b);
         break;
+      case "circle":
+        put(0, "CIRCLE");
+        put(8, "LINES");
+        put(10, entity.c[0]);
+        put(20, -entity.c[1]);
+        put(40, entity.r);
+        break;
+      case "arc": {
+        const circle = circleThrough(entity.a, entity.m, entity.b);
+        if (!circle) {
+          line("LINES", entity.a, entity.b);
+          break;
+        }
+        // DXF arcs always run anticlockwise from the start angle to the end.
+        const angleOf = (p: Pt) =>
+          ((Math.atan2(-(p[1] - circle.c[1]), p[0] - circle.c[0]) * 180) / Math.PI + 360) % 360;
+        const turn =
+          (entity.m[0] - entity.a[0]) * (entity.b[1] - entity.m[1]) -
+          (entity.m[1] - entity.a[1]) * (entity.b[0] - entity.m[0]);
+        const clockwise = turn > 0;
+        put(0, "ARC");
+        put(8, "LINES");
+        put(10, circle.c[0]);
+        put(20, -circle.c[1]);
+        put(40, circle.r);
+        put(50, angleOf(clockwise ? entity.b : entity.a));
+        put(51, angleOf(clockwise ? entity.a : entity.b));
+        break;
+      }
     }
   }
 
@@ -170,12 +199,12 @@ export function exportDxf(doc: PlanDoc): string {
 const MAX_IMPORTED_LINES = 8000;
 
 /**
- * Reads the lines and polylines from a DXF file as drafting lines.
+ * Reads lines, polylines, circles, arcs and text from a DXF file.
  * Returns null if the file does not look like a DXF.
  */
 export function importDxf(
   content: string,
-): { lines: Line[]; skipped: number } | null {
+): { lines: Entity[]; skipped: number } | null {
   const rows = content.split(/\r\n|\r|\n/);
   const pairs: [number, string][] = [];
   for (let i = 0; i + 1 < rows.length; i += 2) {
@@ -195,19 +224,19 @@ export function importDxf(
     factor = { 1: 25.4, 2: 304.8, 5: 10, 6: 1000 }[units] ?? 1;
   }
 
-  const lines: Line[] = [];
+  const lines: Entity[] = [];
   let skipped = 0;
+  // DXF position -> our position (millimetres, y pointing down).
+  const place = (p: Pt): Pt => [p[0] * factor, -p[1] * factor];
+  const full = () => {
+    if (lines.length < MAX_IMPORTED_LINES) return false;
+    skipped++;
+    return true;
+  };
   const addLine = (a: Pt, b: Pt) => {
-    if (lines.length >= MAX_IMPORTED_LINES) {
-      skipped++;
-      return;
-    }
-    lines.push({
-      id: newId(),
-      kind: "line",
-      a: [a[0] * factor, -a[1] * factor],
-      b: [b[0] * factor, -b[1] * factor],
-    });
+    if (full()) return;
+    const line: Line = { id: newId(), kind: "line", a: place(a), b: place(b) };
+    lines.push(line);
   };
 
   let start = pairs.findIndex(([c, v]) => c === 2 && v === "ENTITIES");
@@ -246,8 +275,40 @@ export function importDxf(
       const closed = (num(70) & 1) === 1;
       for (let k = 0; k + 1 < points.length; k++) addLine(points[k], points[k + 1]);
       if (closed && points.length > 2) addLine(points[points.length - 1], points[0]);
+    } else if (value === "CIRCLE") {
+      const centre: Pt = [num(10), num(20)];
+      const radius = num(40);
+      if ([...centre, radius].every(Number.isFinite) && radius > 0 && !full()) {
+        lines.push({ id: newId(), kind: "circle", c: place(centre), r: radius * factor });
+      }
+    } else if (value === "ARC") {
+      const centre: Pt = [num(10), num(20)];
+      const radius = num(40);
+      const start = num(50);
+      const end = num(51);
+      if ([...centre, radius, start, end].every(Number.isFinite) && radius > 0 && !full()) {
+        const at = (degrees: number): Pt => [
+          centre[0] + radius * Math.cos((degrees * Math.PI) / 180),
+          centre[1] + radius * Math.sin((degrees * Math.PI) / 180),
+        ];
+        const sweep = (((end - start) % 360) + 360) % 360 || 360;
+        lines.push({
+          id: newId(),
+          kind: "arc",
+          a: place(at(start)),
+          b: place(at(start + sweep)),
+          m: place(at(start + sweep / 2)),
+        });
+      }
+    } else if (value === "TEXT" || value === "MTEXT") {
+      const at: Pt = [num(10), num(20)];
+      const found = body.find(([c]) => c === 1);
+      const words = found ? found[1].replace(/\\P/g, " ").replace(/\{|\}|\\[A-Za-z][^;]*;/g, "") : "";
+      if (at.every(Number.isFinite) && words.trim() && !full()) {
+        lines.push({ id: newId(), kind: "text", p: place(at), text: words.trim().slice(0, 200), size: 1 });
+      }
     } else if (value !== "SECTION") {
-      // Arcs, circles, blocks, text and so on are not brought in yet.
+      // Blocks, hatches, dimensions and so on are not brought in yet.
       if (!["VERTEX", "SEQEND", "POLYLINE"].includes(value)) skipped++;
     }
     i = end;

@@ -65,6 +65,7 @@ export type Label = {
   p: Pt;
   text: string;
   size: number; // 1 = normal lettering size
+  level?: boolean; // true = a level mark (a height above or below ground)
 };
 
 export type Line = {
@@ -72,6 +73,22 @@ export type Line = {
   kind: "line";
   a: Pt;
   b: Pt;
+};
+
+export type Circle = {
+  id: string;
+  kind: "circle";
+  c: Pt; // centre
+  r: number;
+};
+
+// An arc that starts at a, ends at b and passes through m.
+export type Arc = {
+  id: string;
+  kind: "arc";
+  a: Pt;
+  b: Pt;
+  m: Pt;
 };
 
 // A picture placed under the drawing to trace over: a site map, a survey,
@@ -95,6 +112,8 @@ export type Entity =
   | Furn
   | Label
   | Line
+  | Circle
+  | Arc
   | Underlay;
 
 // The plot of land. Its top-left corner is at 0,0 and the road is along the
@@ -180,6 +199,8 @@ export function layerOf(entity: Entity): string {
     case "text":
       return "text";
     case "line":
+    case "circle":
+    case "arc":
       return "lines";
     case "image":
       return "underlay";
@@ -190,6 +211,9 @@ export const DOOR_STYLES = [
   { id: "single", name: "Single swing", width: 900 },
   { id: "double", name: "Double swing", width: 1500 },
   { id: "sliding", name: "Sliding", width: 1800 },
+  { id: "pocket", name: "Pocket (slides into wall)", width: 900 },
+  { id: "bifold", name: "Bifold", width: 1800 },
+  { id: "garage", name: "Garage / shutter", width: 2700 },
   { id: "opening", name: "Open archway", width: 1200 },
 ];
 
@@ -198,6 +222,9 @@ export const WINDOW_STYLES = [
   { id: "sliding", name: "Sliding", width: 1500 },
   { id: "fixed", name: "Fixed glass", width: 1800 },
   { id: "ventilator", name: "Ventilator", width: 600 },
+  { id: "bay", name: "Bay window", width: 2100 },
+  { id: "louvre", name: "Louvre", width: 900 },
+  { id: "french", name: "French window", width: 1500 },
 ];
 
 export const TREE_STYLES = [
@@ -205,6 +232,7 @@ export const TREE_STYLES = [
   { id: "branch", name: "Branches" },
   { id: "palm", name: "Palm" },
   { id: "shrub", name: "Shrub" },
+  { id: "conifer", name: "Conifer" },
 ];
 
 export const FLOOR_FINISHES = [
@@ -213,7 +241,11 @@ export const FLOOR_FINISHES = [
   { id: "tile300", name: "Tiles 300 x 300" },
   { id: "wood", name: "Wood planks" },
   { id: "stone", name: "Stone paving" },
+  { id: "marble", name: "Marble" },
   { id: "concrete", name: "Concrete" },
+  { id: "brick", name: "Brick paving" },
+  { id: "deck", name: "Timber deck" },
+  { id: "gravel", name: "Gravel" },
   { id: "grass", name: "Grass" },
   { id: "water", name: "Water" },
 ];

@@ -2,6 +2,7 @@ import { getFurniture, type Part } from "@/lib/plan/furniture";
 import {
   add,
   angleDeg,
+  arcPath,
   centroid,
   dist,
   extents,
@@ -18,6 +19,8 @@ import {
 } from "@/lib/plan/geometry";
 import { FINISH_COLOURS, getStyle, type PlanStyle } from "@/lib/plan/styles";
 import type {
+  Arc,
+  Circle,
   Dim,
   Furn,
   Label,
@@ -116,6 +119,24 @@ function FinishPatterns({ style }: { style: PlanStyle }) {
         "M80 120l30 -60M110 120l20 -50M300 260l30 -60M330 260l20 -50M150 420l30 -60M420 90l25 -55M400 440l30 -60",
       )}
       {make("water", 600, 300, "M0 150Q150 80 300 150T600 150")}
+      {make("marble", 1200, 1200, "M1200 0H0V1200M150 1050L420 700L380 520M700 200L900 420L1080 380")}
+      {make("brick", 480, 240, "M0 0H480M0 120H480M0 0V120M240 0V120M120 120V240M360 120V240")}
+      {make("deck", 1800, 140, "M0 0H1800M900 0V140")}
+      {make(
+        "gravel",
+        400,
+        400,
+        "",
+        <>
+          <circle cx="60" cy="80" r="10" />
+          <circle cx="210" cy="40" r="7" />
+          <circle cx="330" cy="130" r="10" />
+          <circle cx="130" cy="220" r="8" />
+          <circle cx="280" cy="270" r="10" />
+          <circle cx="70" cy="340" r="7" />
+          <circle cx="360" cy="360" r="8" />
+        </>,
+      )}
     </>
   );
 }
@@ -244,6 +265,24 @@ function TreeView({ tree, style }: { tree: Tree; style: PlanStyle }) {
         />,
       );
     }
+  } else if (tree.style === "conifer") {
+    // A pointed star, the usual plan symbol for a pine or fir.
+    const points: string[] = [];
+    const tips = 12;
+    for (let i = 0; i < tips * 2; i++) {
+      const angle = (i / (tips * 2)) * Math.PI * 2;
+      const reach = i % 2 === 0 ? r : r * 0.62;
+      points.push(`${x + Math.cos(angle) * reach},${y + Math.sin(angle) * reach}`);
+    }
+    parts.push(
+      <polygon
+        key="star"
+        points={points.join(" ")}
+        fill={coloured ? pick() : "none"}
+        fillOpacity="0.75"
+      />,
+    );
+    parts.push(<circle key="c" cx={x} cy={y} r={r * 0.08} fill={style.treeLine} />);
   } else if (tree.style === "palm") {
     if (coloured) {
       parts.push(<circle key="bg" cx={x} cy={y} r={r} fill={pick()} fillOpacity="0.3" stroke="none" />);
@@ -322,6 +361,29 @@ function OpeningView({
           <line x1={-w * 0.08} y1={t / 6} x2={half} y2={t / 6} strokeWidth="2.2" />
         </>
       );
+    } else if (opening.style === "pocket") {
+      // The leaf slides into a pocket inside the wall.
+      symbol = (
+        <>
+          <rect x={-half - w} y={-t / 4} width={w} height={t / 2} strokeDasharray="4 3" strokeOpacity="0.7" />
+          <line x1={-half - w * 0.45} y1={0} x2={-half + w * 0.55} y2={0} strokeWidth="2.4" />
+        </>
+      );
+    } else if (opening.style === "bifold") {
+      symbol = (
+        <path
+          d={`M ${-half} ${t / 2} L ${-half + w / 4} ${t / 2 + w / 4} L 0 ${t / 2}
+              M ${half} ${t / 2} L ${half - w / 4} ${t / 2 + w / 4} L 0 ${t / 2}`}
+        />
+      );
+    } else if (opening.style === "garage") {
+      // The door rolls or swings up overhead: shown dashed.
+      symbol = (
+        <>
+          <line x1={-half} y1={0} x2={half} y2={0} strokeWidth="2.2" />
+          <rect x={-half} y={t / 2} width={w} height={w * 0.3} strokeDasharray="6 4" strokeOpacity="0.7" />
+        </>
+      );
     } else if (opening.style === "opening") {
       symbol = (
         <path
@@ -353,6 +415,43 @@ function OpeningView({
           {frame}
           <line x1={-half} y1={-t / 8} x2={half} y2={-t / 8} />
           <line x1={-half} y1={t / 8} x2={half} y2={t / 8} />
+        </>
+      );
+    } else if (opening.style === "bay") {
+      // A bay window steps out beyond the wall.
+      const out = w * 0.28;
+      const inset = w * 0.2;
+      symbol = (
+        <>
+          <path
+            d={`M ${-half} ${t / 2} L ${-half + inset} ${t / 2 + out} L ${half - inset} ${t / 2 + out} L ${half} ${t / 2}`}
+            strokeWidth="2"
+          />
+          <path
+            d={`M ${-half} ${-t / 2} L ${-half} ${t / 2} M ${half} ${-t / 2} L ${half} ${t / 2}
+                M ${-half + inset * 0.75} ${t / 2 + out * 0.75} L ${half - inset * 0.75} ${t / 2 + out * 0.75}`}
+          />
+        </>
+      );
+    } else if (opening.style === "louvre") {
+      symbol = (
+        <>
+          {frame}
+          {[-0.36, -0.18, 0, 0.18, 0.36].map((k) => (
+            <line key={k} x1={w * k - t * 0.25} y1={t * 0.3} x2={w * k + t * 0.25} y2={-t * 0.3} />
+          ))}
+        </>
+      );
+    } else if (opening.style === "french") {
+      // Full-height glazed doors: two leaves with light swing arcs.
+      symbol = (
+        <>
+          {frame}
+          <path
+            d={`M ${-half} ${t / 2} L ${-half} ${t / 2 + half} A ${half} ${half} 0 0 0 0 ${t / 2}
+                M ${half} ${t / 2} L ${half} ${t / 2 + half} A ${half} ${half} 0 0 1 0 ${t / 2}`}
+            strokeOpacity="0.7"
+          />
         </>
       );
     } else if (opening.style === "ventilator") {
@@ -655,6 +754,26 @@ export default function PlanDrawing({
           </g>
         ))}
 
+      {show("lines") && (
+        <g fill="none">
+          {(of("circle") as Circle[]).map((circle) => (
+            <g key={circle.id} data-id={circle.id}>
+              <circle cx={circle.c[0]} cy={circle.c[1]} r={circle.r} stroke="transparent" strokeWidth="12" />
+              <circle cx={circle.c[0]} cy={circle.c[1]} r={circle.r} stroke={style.ink} strokeWidth="1.1" />
+            </g>
+          ))}
+          {(of("arc") as Arc[]).map((arc) => {
+            const d = arcPath(arc.a, arc.m, arc.b);
+            return (
+              <g key={arc.id} data-id={arc.id}>
+                <path d={d} stroke="transparent" strokeWidth="12" />
+                <path d={d} stroke={style.ink} strokeWidth="1.1" />
+              </g>
+            );
+          })}
+        </g>
+      )}
+
       {/* Walls are drawn twice: outlines first, then fills on top, so that
           walls which meet merge into one clean shape. */}
       {show("walls") && (
@@ -725,19 +844,35 @@ export default function PlanDrawing({
       )}
 
       {show("text") &&
-        (of("text") as Label[]).map((label) => (
-          <text
-            key={label.id}
-            data-id={label.id}
-            x={label.p[0]}
-            y={label.p[1]}
-            fontSize={letter * label.size}
-            fontFamily={FONT}
-            fill={style.text}
-          >
-            {label.text}
-          </text>
-        ))}
+        (of("text") as Label[]).map((label) => {
+          const size = letter * label.size;
+          return (
+            <g key={label.id} data-id={label.id}>
+              {label.level && (
+                // A level mark: a small target showing where the height applies.
+                <g stroke={style.ink} strokeWidth="1.2" fill="none">
+                  <circle cx={label.p[0]} cy={label.p[1]} r={size * 0.45} />
+                  <path
+                    d={`M ${label.p[0] - size * 0.7} ${label.p[1]} H ${label.p[0] + size * 0.7} M ${label.p[0]} ${label.p[1] - size * 0.7} V ${label.p[1] + size * 0.7}`}
+                  />
+                  <path
+                    d={`M ${label.p[0]} ${label.p[1]} L ${label.p[0] + size * 0.45} ${label.p[1]} A ${size * 0.45} ${size * 0.45} 0 0 0 ${label.p[0]} ${label.p[1] - size * 0.45} Z`}
+                    fill={style.ink}
+                  />
+                </g>
+              )}
+              <text
+                x={label.p[0] + (label.level ? size * 0.9 : 0)}
+                y={label.p[1] + (label.level ? size * 0.35 : 0)}
+                fontSize={size}
+                fontFamily={FONT}
+                fill={style.text}
+              >
+                {label.text}
+              </text>
+            </g>
+          );
+        })}
 
       {show("marks") && <SheetMarks doc={doc} style={style} letter={letter} />}
     </g>

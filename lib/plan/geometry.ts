@@ -141,23 +141,183 @@ export function wallJunctionCorners(walls: Wall[]): Pt[] {
 
 // --- Moving things ----------------------------------------------------------
 
-export function moveEntity(entity: Entity, dx: number, dy: number): Entity {
-  const shift = (p: Pt): Pt => [p[0] + dx, p[1] + dy];
+/** Applies the same change to every point of an object. */
+function mapPoints(entity: Entity, change: (p: Pt) => Pt): Entity {
   switch (entity.kind) {
     case "wall":
     case "line":
     case "dim":
-      return { ...entity, a: shift(entity.a), b: shift(entity.b) };
+      return { ...entity, a: change(entity.a), b: change(entity.b) };
+    case "arc":
+      return {
+        ...entity,
+        a: change(entity.a),
+        b: change(entity.b),
+        m: change(entity.m),
+      };
+    case "circle":
+      return { ...entity, c: change(entity.c) };
     case "room":
-      return { ...entity, pts: entity.pts.map(shift) };
+      return { ...entity, pts: entity.pts.map(change) };
     case "tree":
     case "furn":
     case "text":
     case "image":
-      return { ...entity, p: shift(entity.p) };
+      return { ...entity, p: change(entity.p) };
     default:
-      return entity; // doors and windows slide along their wall instead
+      return entity; // doors and windows stay with their wall
   }
+}
+
+export function moveEntity(entity: Entity, dx: number, dy: number): Entity {
+  return mapPoints(entity, (p) => [p[0] + dx, p[1] + dy]);
+}
+
+/** Turns an object around a centre point. Positive degrees turn clockwise. */
+export function rotateEntity(entity: Entity, centre: Pt, degrees: number): Entity {
+  if (entity.kind === "image") return entity; // pictures stay upright
+  const angle = (degrees * Math.PI) / 180;
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const turned = mapPoints(entity, (p) => {
+    const x = p[0] - centre[0];
+    const y = p[1] - centre[1];
+    return roundPt([centre[0] + x * cos - y * sin, centre[1] + x * sin + y * cos]);
+  });
+  if (turned.kind === "furn") {
+    return { ...turned, rot: (((turned.rot + degrees) % 360) + 360) % 360 };
+  }
+  return turned;
+}
+
+/** Flips an object left-to-right ("x") or top-to-bottom ("y") about a centre. */
+export function mirrorEntity(entity: Entity, centre: Pt, axis: "x" | "y"): Entity {
+  if (entity.kind === "image") return entity;
+  if (entity.kind === "door" || entity.kind === "window") {
+    // The wall has been flipped, so the door must swing the other way to
+    // stay a true mirror image.
+    return { ...entity, flipSide: !entity.flipSide };
+  }
+  const flipped = mapPoints(entity, (p) =>
+    axis === "x" ? [2 * centre[0] - p[0], p[1]] : [p[0], 2 * centre[1] - p[1]],
+  );
+  if (flipped.kind === "furn") {
+    const rot = axis === "x" ? -flipped.rot : 180 - flipped.rot;
+    return { ...flipped, rot: ((rot % 360) + 360) % 360 };
+  }
+  return flipped;
+}
+
+/** A copy of a wall or line, moved sideways by a distance (negative = other side). */
+export function offsetPoints(a: Pt, b: Pt, distance: number): [Pt, Pt] {
+  const n = mul(perp(unit(a, b)), distance);
+  return [roundPt(add(a, n)), roundPt(add(b, n))];
+}
+
+// --- Arcs ------------------------------------------------------------------
+
+/** The centre and radius of the circle through three points (null if in a line). */
+export function circleThrough(a: Pt, m: Pt, b: Pt): { c: Pt; r: number } | null {
+  const d = 2 * (a[0] * (m[1] - b[1]) + m[0] * (b[1] - a[1]) + b[0] * (a[1] - m[1]));
+  if (Math.abs(d) < 1e-6) return null;
+  const a2 = a[0] * a[0] + a[1] * a[1];
+  const m2 = m[0] * m[0] + m[1] * m[1];
+  const b2 = b[0] * b[0] + b[1] * b[1];
+  const c: Pt = [
+    (a2 * (m[1] - b[1]) + m2 * (b[1] - a[1]) + b2 * (a[1] - m[1])) / d,
+    (a2 * (b[0] - m[0]) + m2 * (a[0] - b[0]) + b2 * (m[0] - a[0])) / d,
+  ];
+  return { c, r: dist(c, a) };
+}
+
+/** The SVG path for an arc from a to b that passes through m. */
+export function arcPath(a: Pt, m: Pt, b: Pt): string {
+  const circle = circleThrough(a, m, b);
+  if (!circle || circle.r > 1e7) return `M ${a[0]} ${a[1]} L ${b[0]} ${b[1]}`;
+  const cross = (p: Pt, q: Pt, o: Pt) =>
+    (p[0] - o[0]) * (q[1] - o[1]) - (p[1] - o[1]) * (q[0] - o[0]);
+  const turn = (m[0] - a[0]) * (b[1] - m[1]) - (m[1] - a[1]) * (b[0] - m[0]);
+  const sweep = turn > 0 ? 1 : 0;
+  const large = cross(b, m, a) * cross(b, circle.c, a) > 0 ? 1 : 0;
+  return `M ${a[0]} ${a[1]} A ${circle.r} ${circle.r} 0 ${large} ${sweep} ${b[0]} ${b[1]}`;
+}
+
+// --- Selecting by box --------------------------------------------------------
+
+/** The rectangle around one object. */
+export function entityBox(entity: Entity, walls: Wall[]): Box {
+  const xs: number[] = [];
+  const ys: number[] = [];
+  const take = (p: Pt, pad = 0) => {
+    xs.push(p[0] - pad, p[0] + pad);
+    ys.push(p[1] - pad, p[1] + pad);
+  };
+  switch (entity.kind) {
+    case "wall":
+      wallCorners(entity, []).forEach((p) => take(p));
+      break;
+    case "line":
+    case "dim":
+      take(entity.a);
+      take(entity.b);
+      break;
+    case "arc":
+      take(entity.a);
+      take(entity.b);
+      take(entity.m);
+      break;
+    case "circle":
+      take(entity.c, entity.r);
+      break;
+    case "room":
+      entity.pts.forEach((p) => take(p));
+      break;
+    case "tree":
+      take(entity.p, entity.r);
+      break;
+    case "furn":
+      take(entity.p, 400);
+      break;
+    case "text":
+      take(entity.p, 100);
+      break;
+    case "image":
+      take(entity.p);
+      take([entity.p[0] + entity.w, entity.p[1] + entity.h]);
+      break;
+    case "door":
+    case "window": {
+      const wall = walls.find((w) => w.id === entity.wallId);
+      if (wall) {
+        take(add(wall.a, mul(unit(wall.a, wall.b), entity.pos)), entity.width / 2);
+      }
+      break;
+    }
+  }
+  if (xs.length === 0) return { x: 0, y: 0, w: 0, h: 0 };
+  const x = Math.min(...xs);
+  const y = Math.min(...ys);
+  return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y };
+}
+
+/** True when the object lies completely inside the box. */
+export function boxContains(outer: Box, inner: Box): boolean {
+  return (
+    inner.x >= outer.x &&
+    inner.y >= outer.y &&
+    inner.x + inner.w <= outer.x + outer.w &&
+    inner.y + inner.h <= outer.y + outer.h
+  );
+}
+
+/** True when the object touches the box at all. */
+export function boxTouches(first: Box, second: Box): boolean {
+  return (
+    first.x <= second.x + second.w &&
+    second.x <= first.x + first.w &&
+    first.y <= second.y + second.h &&
+    second.y <= first.y + first.h
+  );
 }
 
 // --- Extents ---------------------------------------------------------------
@@ -205,6 +365,14 @@ export function extents(doc: PlanDoc): Box {
       case "image":
         take(entity.p);
         take([entity.p[0] + entity.w, entity.p[1] + entity.h]);
+        break;
+      case "circle":
+        take(entity.c, entity.r);
+        break;
+      case "arc":
+        take(entity.a);
+        take(entity.b);
+        take(entity.m);
         break;
     }
   }

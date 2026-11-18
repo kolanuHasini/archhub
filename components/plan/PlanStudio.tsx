@@ -18,8 +18,15 @@ import { FURNITURE, getFurniture } from "@/lib/plan/furniture";
 import {
   add,
   angleDeg,
+  arcPath,
+  boxContains,
+  boxTouches,
   dist,
+  entityBox,
   extents,
+  mirrorEntity,
+  offsetPoints,
+  rotateEntity,
   formatArea,
   formatAreaFeet,
   formatLength,
@@ -46,6 +53,7 @@ import {
   TREE_STYLES,
   WALL_THICKNESSES,
   WINDOW_STYLES,
+  layerOf,
   newId,
   type Entity,
   type Opening,
@@ -80,7 +88,11 @@ type ToolId =
   | "line"
   | "furn"
   | "tree"
-  | "text";
+  | "text"
+  | "rect"
+  | "circle"
+  | "arc"
+  | "level";
 
 const TOOLS: { id: ToolId; label: string; key: string; group: string }[] = [
   { id: "select", label: "Select", key: "V", group: "Edit" },
@@ -92,7 +104,11 @@ const TOOLS: { id: ToolId; label: string; key: string; group: string }[] = [
   { id: "furn", label: "Furniture", key: "F", group: "Place" },
   { id: "tree", label: "Tree", key: "T", group: "Place" },
   { id: "dim", label: "Dimension", key: "M", group: "Annotate" },
-  { id: "line", label: "Line", key: "L", group: "Annotate" },
+  { id: "level", label: "Level mark", key: "E", group: "Annotate" },
+  { id: "line", label: "Line", key: "L", group: "Draft" },
+  { id: "rect", label: "Rectangle", key: "B", group: "Draft" },
+  { id: "circle", label: "Circle", key: "C", group: "Draft" },
+  { id: "arc", label: "Arc", key: "A", group: "Draft" },
   { id: "text", label: "Text", key: "X", group: "Annotate" },
 ];
 
@@ -112,7 +128,9 @@ type Snap = { p: Pt; kind: string | null };
 type Drag =
   | { kind: "pan"; x: number; y: number; cx: number; cy: number }
   | { kind: "move"; original: Entity; start: Pt; x: number; y: number; moved: boolean }
-  | { kind: "grip"; original: Entity; grip: string };
+  | { kind: "grip"; original: Entity; grip: string }
+  | { kind: "group"; originals: Entity[]; start: Pt; x: number; y: number; moved: boolean }
+  | { kind: "box"; start: Pt };
 
 function isEntity(value: unknown): value is Entity {
   if (!value || typeof value !== "object") return false;
@@ -189,17 +207,22 @@ export default function PlanStudio() {
   const { settings } = doc;
 
   const [tool, setToolState] = useState<ToolId>("wall");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const selectedId = selectedIds.length === 1 ? selectedIds[0] : null;
+  const setSelectedId = (id: string | null) => setSelectedIds(id ? [id] : []);
+  const [box, setBox] = useState<{ a: Pt; b: Pt } | null>(null); // selection box being dragged
   const [points, setPoints] = useState<Pt[]>([]); // clicks so far with this tool
   const [cursor, setCursor] = useState<Snap | null>(null);
   const [buffer, setBuffer] = useState(""); // a length being typed
-  const [override, setOverride] = useState<Entity | null>(null); // being dragged
+  const [overrides, setOverrides] = useState<Entity[]>([]); // objects being dragged
+  const setOverride = (entity: Entity | null) => setOverrides(entity ? [entity] : []);
   const [hoverOpening, setHoverOpening] = useState<{ wallId: string; pos: number } | null>(null);
   const [view, setView] = useState<View | null>(null); // null = fit to drawing
   const [size, setSize] = useState({ w: 900, h: 600 });
   const [past, setPast] = useState<PlanDoc[]>([]);
   const [future, setFuture] = useState<PlanDoc[]>([]);
-  const [panelOpen, setPanelOpen] = useState(true);
+  // null = automatic: shown on wide screens, tucked away on narrow ones.
+  const [panelOpen, setPanelOpen] = useState<boolean | null>(null);
   const [notice, setNotice] = useState("");
   const [options, setOptions] = useState({
     doorStyle: "single",
@@ -210,6 +233,8 @@ export default function PlanStudio() {
     treeRadius: 1500,
     furnItem: FURNITURE[0].id,
     furnRot: 0,
+    offset: 1000,
+    rectAs: "wall" as "wall" | "line",
   });
 
   const svgRef = useRef<SVGSVGElement>(null);
@@ -230,9 +255,14 @@ export default function PlanStudio() {
     [doc.entities],
   );
   const rooms = doc.entities.filter((e): e is Room => e.kind === "room");
-  const shown: PlanDoc = override
-    ? { ...doc, entities: doc.entities.map((e) => (e.id === override.id ? override : e)) }
-    : doc;
+  const shown: PlanDoc =
+    overrides.length > 0
+      ? {
+          ...doc,
+          entities: doc.entities.map((e) => overrides.find((o) => o.id === e.id) ?? e),
+        }
+      : doc;
+  const selectedMany = shown.entities.filter((e) => selectedIds.includes(e.id));
   const selected = shown.entities.find((e) => e.id === selectedId) ?? null;
 
   // --- Saving, undo, redo ------------------------------------------------------
@@ -266,9 +296,9 @@ export default function PlanStudio() {
   }
 
   function deleteSelected() {
-    if (!selectedId) return;
-    commit(dropOrphanOpenings(doc.entities.filter((e) => e.id !== selectedId)));
-    setSelectedId(null);
+    if (selectedIds.length === 0) return;
+    commit(dropOrphanOpenings(doc.entities.filter((e) => !selectedIds.includes(e.id))));
+    setSelectedIds([]);
   }
 
   function setTool(next: ToolId) {
@@ -288,6 +318,11 @@ export default function PlanStudio() {
         targets.push({ p: entity.a, kind: "Endpoint", owner: entity.id });
         targets.push({ p: entity.b, kind: "Endpoint", owner: entity.id });
         targets.push({ p: mid(entity.a, entity.b), kind: "Midpoint", owner: entity.id });
+      } else if (entity.kind === "arc") {
+        targets.push({ p: entity.a, kind: "Endpoint", owner: entity.id });
+        targets.push({ p: entity.b, kind: "Endpoint", owner: entity.id });
+      } else if (entity.kind === "circle") {
+        targets.push({ p: entity.c, kind: "Centre", owner: entity.id });
       }
     }
     for (const corner of wallJunctionCorners(walls)) {
@@ -475,25 +510,51 @@ export default function PlanStudio() {
       }
       const id = element?.closest("[data-id]")?.getAttribute("data-id");
       const hit = id ? doc.entities.find((e) => e.id === id) : undefined;
-      setSelectedId(hit ? hit.id : null);
-      if (hit) {
-        event.currentTarget.setPointerCapture(event.pointerId);
+      event.currentTarget.setPointerCapture(event.pointerId);
+      if (!hit) {
+        // Empty space: start a selection box.
+        if (!event.shiftKey) setSelectedIds([]);
+        dragRef.current = { kind: "box", start: raw };
+        return;
+      }
+      if (event.shiftKey) {
+        // Shift-click adds to, or removes from, the selection.
+        setSelectedIds(
+          selectedIds.includes(hit.id)
+            ? selectedIds.filter((item) => item !== hit.id)
+            : [...selectedIds, hit.id],
+        );
+        return;
+      }
+      if (selectedIds.length > 1 && selectedIds.includes(hit.id)) {
+        // Drag the whole selection together.
         dragRef.current = {
-          kind: "move",
-          original: hit,
+          kind: "group",
+          originals: doc.entities.filter((e) => selectedIds.includes(e.id)),
           start: raw,
           x: event.clientX,
           y: event.clientY,
           moved: false,
         };
-      } else {
-        startPan();
+        return;
       }
+      setSelectedId(hit.id);
+      dragRef.current = {
+        kind: "move",
+        original: hit,
+        start: raw,
+        x: event.clientX,
+        y: event.clientY,
+        moved: false,
+      };
       return;
     }
 
-    const from = points.length > 0 ? points[points.length - 1] : null;
-    const snapped = snapPoint(raw, tool === "dim" && points.length === 2 ? null : from, event.shiftKey);
+    // Angle lock only applies to tools that draw one straight piece after another.
+    const straight =
+      tool === "wall" || tool === "line" || tool === "room" || (tool === "dim" && points.length === 1);
+    const from = straight && points.length > 0 ? points[points.length - 1] : null;
+    const snapped = snapPoint(raw, from, event.shiftKey);
     const p = snapped.p;
 
     if (tool === "wall" || tool === "line") {
@@ -553,6 +614,37 @@ export default function PlanStudio() {
           { id: newId(), kind: "text", p, text: text.trim().slice(0, 200), size: 1 },
         ]);
       }
+    } else if (tool === "level") {
+      const text = window.prompt(
+        "Height at this point, in metres, compared with your zero level (for example +0.45 or -1.20):",
+      );
+      if (text && text.trim()) {
+        commit([
+          ...doc.entities,
+          { id: newId(), kind: "text", p, text: text.trim().slice(0, 40), size: 1, level: true },
+        ]);
+      }
+    } else if (tool === "rect") {
+      if (points.length === 0) setPoints([p]);
+      else addRectangle(points[0], p);
+    } else if (tool === "circle") {
+      if (points.length === 0) {
+        setPoints([p]);
+      } else if (dist(points[0], p) >= 10) {
+        commit([
+          ...doc.entities,
+          { id: newId(), kind: "circle", c: points[0], r: Math.round(dist(points[0], p)) },
+        ]);
+        setPoints([]);
+        setBuffer("");
+      }
+    } else if (tool === "arc") {
+      if (points.length < 2) {
+        setPoints([...points, p]);
+      } else {
+        commit([...doc.entities, { id: newId(), kind: "arc", a: points[0], b: points[1], m: p }]);
+        setPoints([]);
+      }
     }
   }
 
@@ -566,6 +658,24 @@ export default function PlanStudio() {
         cx: drag.cx - (event.clientX - drag.x) / v.zoom,
         cy: drag.cy - (event.clientY - drag.y) / v.zoom,
       });
+      return;
+    }
+
+    if (drag?.kind === "box") {
+      setBox({ a: drag.start, b: raw });
+      return;
+    }
+
+    if (drag?.kind === "group") {
+      if (!drag.moved && Math.hypot(event.clientX - drag.x, event.clientY - drag.y) < 4) return;
+      drag.moved = true;
+      let dx = raw[0] - drag.start[0];
+      let dy = raw[1] - drag.start[1];
+      if (settings.snap) {
+        dx = Math.round(dx / 50) * 50;
+        dy = Math.round(dy / 50) * 50;
+      }
+      setOverrides(drag.originals.map((e) => moveEntity(e, dx, dy)));
       return;
     }
 
@@ -603,6 +713,8 @@ export default function PlanStudio() {
         setOverride(
           drag.grip === "a" ? { ...original, a: snapped.p } : { ...original, b: snapped.p },
         );
+      } else if (original.kind === "arc") {
+        setOverride({ ...original, [drag.grip]: snapped.p });
       } else if (original.kind === "room") {
         const index = Number(drag.grip);
         setOverride({
@@ -626,10 +738,32 @@ export default function PlanStudio() {
   function onPointerUp() {
     const drag = dragRef.current;
     dragRef.current = null;
-    if (drag && drag.kind !== "pan" && override) {
-      commit(doc.entities.map((e) => (e.id === override.id ? override : e)));
+    if (drag?.kind === "box" && box) {
+      // Dragging left-to-right picks only what is fully inside the box;
+      // right-to-left also picks anything the box touches (as in AutoCAD).
+      const area: Box = {
+        x: Math.min(box.a[0], box.b[0]),
+        y: Math.min(box.a[1], box.b[1]),
+        w: Math.abs(box.b[0] - box.a[0]),
+        h: Math.abs(box.b[1] - box.a[1]),
+      };
+      const crossing = box.b[0] < box.a[0];
+      if (area.w > 4 * px || area.h > 4 * px) {
+        setSelectedIds(
+          doc.entities
+            .filter((e) => e.kind !== "image" && !settings.hidden.includes(layerOf(e)))
+            .filter((e) => {
+              const own = entityBox(e, walls);
+              return crossing ? boxTouches(area, own) : boxContains(area, own);
+            })
+            .map((e) => e.id),
+        );
+      }
+    } else if (drag && drag.kind !== "pan" && overrides.length > 0) {
+      commit(doc.entities.map((e) => overrides.find((o) => o.id === e.id) ?? e));
     }
-    setOverride(null);
+    setBox(null);
+    setOverrides([]);
   }
 
   function endCommand() {
@@ -637,69 +771,6 @@ export default function PlanStudio() {
     else setPoints([]);
     setBuffer("");
   }
-
-  // --- Keyboard ---------------------------------------------------------------------------
-
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      const target = event.target as HTMLElement | null;
-      if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
-      const key = event.key;
-
-      if (event.ctrlKey || event.metaKey) {
-        const lower = key.toLowerCase();
-        if (lower === "z" && !event.shiftKey) {
-          event.preventDefault();
-          undo();
-        } else if (lower === "y" || (lower === "z" && event.shiftKey)) {
-          event.preventDefault();
-          redo();
-        }
-        return;
-      }
-
-      const drawingLength = (tool === "wall" || tool === "line") && points.length > 0;
-      if (drawingLength && /^[0-9.]$/.test(key)) {
-        setBuffer(buffer + key);
-        return;
-      }
-      if (key === "Backspace" && buffer) {
-        event.preventDefault();
-        setBuffer(buffer.slice(0, -1));
-        return;
-      }
-      if (key === "Enter") {
-        if (drawingLength && buffer && cursor) {
-          const length = parseLength(buffer, settings.unit);
-          if (length) {
-            const d = unit(points[0], cursor.p);
-            addSegment(points[0], roundPt(add(points[0], mul(d, length))));
-          }
-          setBuffer("");
-        } else {
-          endCommand();
-        }
-        return;
-      }
-      if (key === "Escape") {
-        if (points.length > 0 || buffer) {
-          setPoints([]);
-          setBuffer("");
-        } else {
-          setTool("select");
-        }
-        return;
-      }
-      if (key === "Delete" && selectedId) {
-        deleteSelected();
-        return;
-      }
-      const shortcut = TOOLS.find((item) => item.key.toLowerCase() === key.toLowerCase());
-      if (shortcut && !buffer) setTool(shortcut.id);
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  });
 
   // --- Files --------------------------------------------------------------------------------
 
@@ -744,14 +815,14 @@ export default function PlanStudio() {
       return;
     }
     if (result.lines.length === 0) {
-      window.alert("No lines were found in that DXF file.");
+      window.alert("Nothing that can be imported was found in that DXF file.");
       return;
     }
     commit([...doc.entities, ...result.lines]);
     setView(null);
     setNotice(
-      `Imported ${result.lines.length} lines` +
-        (result.skipped > 0 ? `; ${result.skipped} other items (arcs, text, blocks) were skipped.` : "."),
+      `Imported ${result.lines.length} objects` +
+        (result.skipped > 0 ? `; ${result.skipped} other items (blocks, hatches) were skipped.` : "."),
     );
   }
 
@@ -789,10 +860,80 @@ export default function PlanStudio() {
   }
 
   function duplicateSelected() {
-    if (!selected || selected.kind === "door" || selected.kind === "window") return;
-    const copy = { ...moveEntity(selected, 500, 500), id: newId() };
+    if (selectedMany.length === 0) return;
+    const wallIds = new Map<string, string>();
+    const copies: Entity[] = [];
+    for (const entity of selectedMany) {
+      if (entity.kind === "door" || entity.kind === "window") continue;
+      const copy = { ...moveEntity(entity, 500, 500), id: newId() };
+      if (entity.kind === "wall") wallIds.set(entity.id, copy.id);
+      copies.push(copy);
+    }
+    // Doors and windows are copied along with their wall.
+    for (const entity of doc.entities) {
+      if ((entity.kind === "door" || entity.kind === "window") && wallIds.has(entity.wallId)) {
+        copies.push({ ...entity, id: newId(), wallId: wallIds.get(entity.wallId)! });
+      }
+    }
+    if (copies.length === 0) return;
+    commit([...doc.entities, ...copies]);
+    setSelectedIds(
+      copies.filter((e) => e.kind !== "door" && e.kind !== "window").map((e) => e.id),
+    );
+  }
+
+  // Rotate and mirror work about the middle of everything selected.
+  function transformSelected(
+    change: (entity: Entity, centre: Pt) => Entity,
+    withOpenings: boolean,
+  ) {
+    if (selectedMany.length === 0) return;
+    const boxes = selectedMany.map((e) => entityBox(e, walls));
+    const minX = Math.min(...boxes.map((b) => b.x));
+    const minY = Math.min(...boxes.map((b) => b.y));
+    const maxX = Math.max(...boxes.map((b) => b.x + b.w));
+    const maxY = Math.max(...boxes.map((b) => b.y + b.h));
+    const centre: Pt = [
+      Math.round((minX + maxX) / 20) * 10,
+      Math.round((minY + maxY) / 20) * 10,
+    ];
+    const wallIds = new Set(selectedMany.filter((e) => e.kind === "wall").map((e) => e.id));
+    commit(
+      doc.entities.map((e) => {
+        const isOpening = e.kind === "door" || e.kind === "window";
+        if (selectedIds.includes(e.id) && !isOpening) return change(e, centre);
+        if (withOpenings && isOpening && wallIds.has(e.wallId)) return change(e, centre);
+        return e;
+      }),
+    );
+  }
+
+  const rotateSelected = (degrees: number) =>
+    transformSelected((e, centre) => rotateEntity(e, centre, degrees), false);
+  const mirrorSelected = (axis: "x" | "y") =>
+    transformSelected((e, centre) => mirrorEntity(e, centre, axis), true);
+
+  // A parallel copy of a wall or line, like AutoCAD's OFFSET.
+  function offsetSelected(distance: number) {
+    if (!selected || (selected.kind !== "wall" && selected.kind !== "line")) return;
+    const [a, b] = offsetPoints(selected.a, selected.b, distance);
+    const copy: Entity = { ...selected, id: newId(), a, b };
     commit([...doc.entities, copy]);
     setSelectedId(copy.id);
+  }
+
+  function addRectangle(a: Pt, c: Pt) {
+    if (Math.abs(c[0] - a[0]) < 10 || Math.abs(c[1] - a[1]) < 10) return;
+    const corners: Pt[] = [a, [c[0], a[1]], c, [a[0], c[1]]];
+    const sides: Entity[] = corners.map((corner, index) => {
+      const next = corners[(index + 1) % 4];
+      return options.rectAs === "wall"
+        ? { id: newId(), kind: "wall", a: corner, b: next, t: settings.wallT, h: settings.wallH }
+        : { id: newId(), kind: "line", a: corner, b: next };
+    });
+    commit([...doc.entities, ...sides]);
+    setPoints([]);
+    setBuffer("");
   }
 
   function exportImage(kind: "png" | "svg") {
@@ -849,10 +990,119 @@ export default function PlanStudio() {
     setView(null);
   }
 
+  // --- Keyboard ---------------------------------------------------------------------------
+
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      const target = event.target as HTMLElement | null;
+      if (target && /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName)) return;
+      const key = event.key;
+
+      if (event.ctrlKey || event.metaKey) {
+        const lower = key.toLowerCase();
+        if (lower === "a") {
+          event.preventDefault();
+          setToolState("select");
+          setSelectedIds(doc.entities.filter((e) => e.kind !== "image").map((e) => e.id));
+          return;
+        }
+        if (lower === "d") {
+          event.preventDefault();
+          duplicateSelected();
+          return;
+        }
+        if (lower === "z" && !event.shiftKey) {
+          event.preventDefault();
+          undo();
+        } else if (lower === "y" || (lower === "z" && event.shiftKey)) {
+          event.preventDefault();
+          redo();
+        }
+        return;
+      }
+
+      const drawingLength = (tool === "wall" || tool === "line") && points.length > 0;
+      const typingSize = (tool === "rect" || tool === "circle") && points.length > 0;
+      if (
+        ((drawingLength || typingSize) && /^[0-9.]$/.test(key)) ||
+        (tool === "rect" && typingSize && key === ",")
+      ) {
+        setBuffer(buffer + key);
+        return;
+      }
+      if (key === "Backspace" && buffer) {
+        event.preventDefault();
+        setBuffer(buffer.slice(0, -1));
+        return;
+      }
+      if (key === "Enter") {
+        if (typingSize && buffer) {
+          const start = points[0];
+          if (tool === "rect") {
+            // Typed as width,height - for example 4000,3000
+            const [w, h] = buffer.split(",").map((part) => parseLength(part, settings.unit));
+            if (w && h) {
+              const signX = cursor && cursor.p[0] < start[0] ? -1 : 1;
+              const signY = cursor && cursor.p[1] < start[1] ? -1 : 1;
+              addRectangle(start, [start[0] + signX * w, start[1] + signY * h]);
+            }
+          } else {
+            const radius = parseLength(buffer, settings.unit);
+            if (radius) {
+              commit([...doc.entities, { id: newId(), kind: "circle", c: start, r: radius }]);
+              setPoints([]);
+            }
+          }
+          setBuffer("");
+          return;
+        }
+        if (drawingLength && buffer && cursor) {
+          const length = parseLength(buffer, settings.unit);
+          if (length) {
+            const d = unit(points[0], cursor.p);
+            addSegment(points[0], roundPt(add(points[0], mul(d, length))));
+          }
+          setBuffer("");
+        } else {
+          endCommand();
+        }
+        return;
+      }
+      if (key === "Escape") {
+        if (points.length > 0 || buffer) {
+          setPoints([]);
+          setBuffer("");
+        } else {
+          setTool("select");
+        }
+        return;
+      }
+      if (key === "Delete" && selectedIds.length > 0) {
+        deleteSelected();
+        return;
+      }
+      const shortcut = TOOLS.find((item) => item.key.toLowerCase() === key.toLowerCase());
+      if (shortcut && !buffer) setTool(shortcut.id);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  });
+
   // --- What the command line says -----------------------------------------------------------------
 
   let prompt = "";
-  if (tool === "select") prompt = "Click an object to select it. Drag to move it. Drag empty space to pan.";
+  if (tool === "select") prompt = "Click to select, Shift-click to add. Drag empty space to box-select. Drag objects to move them.";
+  else if (tool === "level") prompt = "LEVEL MARK: click the point, then type its height.";
+  else if (tool === "rect") {
+    prompt =
+      points.length === 0
+        ? "RECTANGLE: click the first corner."
+        : "Click the opposite corner, or type width,height (for example 4000,3000) and press Enter.";
+  } else if (tool === "circle") {
+    prompt = points.length === 0 ? "CIRCLE: click the centre." : "Click for the radius, or type it and press Enter.";
+  } else if (tool === "arc") {
+    prompt = ["ARC: click the start point.", "Click the end point.", "Click a point the arc should pass through."][points.length];
+  }
   else if (tool === "pan") prompt = "Drag to move around the drawing. Scroll to zoom.";
   else if (tool === "wall" || tool === "line") {
     prompt =
@@ -971,6 +1221,17 @@ export default function PlanStudio() {
           {...mark}
         />
       );
+    } else if (selected.kind === "circle") {
+      selectionMark = <circle cx={selected.c[0]} cy={selected.c[1]} r={selected.r} {...mark} />;
+    } else if (selected.kind === "arc") {
+      selectionMark = (
+        <>
+          <path d={arcPath(selected.a, selected.m, selected.b)} {...mark} />
+          {grip(selected.a, "a")}
+          {grip(selected.b, "b")}
+          {grip(selected.m, "m")}
+        </>
+      );
     } else if (selected.kind === "image") {
       selectionMark = (
         <rect x={selected.p[0]} y={selected.p[1]} width={selected.w} height={selected.h} {...mark} />
@@ -1004,7 +1265,18 @@ export default function PlanStudio() {
     const actions = (
       <div className="flex flex-wrap gap-1.5 pt-1">
         {entity.kind !== "door" && entity.kind !== "window" && (
-          <Btn onClick={duplicateSelected}>Duplicate</Btn>
+          <>
+            <Btn onClick={duplicateSelected} title="Ctrl+D">
+              Duplicate
+            </Btn>
+            {entity.kind !== "image" && (
+              <>
+                <Btn onClick={() => rotateSelected(90)}>Rotate 90°</Btn>
+                <Btn onClick={() => mirrorSelected("x")}>Mirror ↔</Btn>
+                <Btn onClick={() => mirrorSelected("y")}>Mirror ↕</Btn>
+              </>
+            )}
+          </>
         )}
         <Btn onClick={deleteSelected} danger>
           Delete
@@ -1060,6 +1332,13 @@ export default function PlanStudio() {
           <Row label="Height">
             <NumInput value={entity.h} min={100} suffix="mm" onCommit={(h) => updateEntity({ ...entity, h })} />
           </Row>
+          <Row label="Offset copy">
+            <NumInput value={options.offset} min={1} suffix="mm" onCommit={(offset) => setOptions({ ...options, offset })} />
+          </Row>
+          <div className="flex flex-wrap gap-1.5">
+            <Btn onClick={() => offsetSelected(options.offset)}>Offset one side</Btn>
+            <Btn onClick={() => offsetSelected(-options.offset)}>Offset other side</Btn>
+          </div>
           <p className="text-[#8b9099]">Drag the blue squares to move either end.</p>
           {actions}
         </Section>
@@ -1170,6 +1449,27 @@ export default function PlanStudio() {
         </Section>
       );
     }
+    if (entity.kind === "circle") {
+      return (
+        <Section title="Circle">
+          <Row label="Radius">
+            <NumInput value={entity.r} min={10} suffix="mm" onCommit={(r) => updateEntity({ ...entity, r })} />
+          </Row>
+          <Row label="Area">
+            <span className="text-[#e6e8ec]">{formatArea(Math.PI * entity.r * entity.r)}</span>
+          </Row>
+          {actions}
+        </Section>
+      );
+    }
+    if (entity.kind === "arc") {
+      return (
+        <Section title="Arc">
+          <p className="text-[#8b9099]">Drag the three blue squares to reshape the arc.</p>
+          {actions}
+        </Section>
+      );
+    }
     if (entity.kind !== "line") return null;
     return (
       <Section title="Line">
@@ -1230,7 +1530,13 @@ export default function PlanStudio() {
           Fit
         </Btn>
         <span className="flex-1" />
-        <Btn onClick={() => setPanelOpen(!panelOpen)} active={panelOpen}>
+        <Btn
+          onClick={() => {
+            const visible = panelOpen ?? window.matchMedia("(min-width: 768px)").matches;
+            setPanelOpen(!visible);
+          }}
+          title="Show or hide the properties panel"
+        >
           Panel
         </Btn>
         <input ref={openRef} type="file" accept=".json,application/json" onChange={openProject} className="hidden" aria-label="Open plan file" />
@@ -1329,6 +1635,82 @@ export default function PlanStudio() {
                 </g>
               )}
 
+              {selectedIds.length > 1 &&
+                selectedMany.map((entity) => {
+                  const own = entityBox(entity, walls);
+                  return (
+                    <rect
+                      key={entity.id}
+                      x={own.x - 3 * px}
+                      y={own.y - 3 * px}
+                      width={own.w + 6 * px}
+                      height={own.h + 6 * px}
+                      fill="none"
+                      stroke={ACCENT}
+                      strokeWidth="1.3"
+                      strokeDasharray="5 4"
+                      pointerEvents="none"
+                    />
+                  );
+                })}
+
+              {box && (
+                <rect
+                  x={Math.min(box.a[0], box.b[0])}
+                  y={Math.min(box.a[1], box.b[1])}
+                  width={Math.abs(box.b[0] - box.a[0])}
+                  height={Math.abs(box.b[1] - box.a[1])}
+                  fill={box.b[0] < box.a[0] ? "#39c06b" : ACCENT}
+                  fillOpacity="0.12"
+                  stroke={box.b[0] < box.a[0] ? "#39c06b" : ACCENT}
+                  strokeWidth="1"
+                  strokeDasharray={box.b[0] < box.a[0] ? "5 4" : undefined}
+                  pointerEvents="none"
+                />
+              )}
+
+              {tool === "rect" && points.length > 0 && cursor && (
+                <g pointerEvents="none">
+                  <rect
+                    x={Math.min(points[0][0], cursor.p[0])}
+                    y={Math.min(points[0][1], cursor.p[1])}
+                    width={Math.abs(cursor.p[0] - points[0][0])}
+                    height={Math.abs(cursor.p[1] - points[0][1])}
+                    fill={ACCENT}
+                    fillOpacity="0.1"
+                    stroke={ACCENT}
+                    strokeWidth="1.2"
+                  />
+                  <text x={cursor.p[0] + 14 * px} y={cursor.p[1] - 12 * px} fontSize={12 * px} fill={ACCENT} stroke={style.paper} strokeWidth="3" paintOrder="stroke">
+                    {formatLength(Math.abs(cursor.p[0] - points[0][0]), settings.unit)} x{" "}
+                    {formatLength(Math.abs(cursor.p[1] - points[0][1]), settings.unit)}
+                  </text>
+                </g>
+              )}
+
+              {tool === "circle" && points.length > 0 && cursor && (
+                <g pointerEvents="none">
+                  <circle cx={points[0][0]} cy={points[0][1]} r={dist(points[0], cursor.p)} fill="none" stroke={ACCENT} strokeWidth="1.2" />
+                  <text x={cursor.p[0] + 14 * px} y={cursor.p[1] - 12 * px} fontSize={12 * px} fill={ACCENT} stroke={style.paper} strokeWidth="3" paintOrder="stroke">
+                    R {formatLength(dist(points[0], cursor.p), settings.unit)}
+                  </text>
+                </g>
+              )}
+
+              {tool === "arc" && points.length > 0 && cursor && (
+                <path
+                  d={
+                    points.length === 1
+                      ? `M ${points[0].join(" ")} L ${cursor.p.join(" ")}`
+                      : arcPath(points[0], cursor.p, points[1])
+                  }
+                  fill="none"
+                  stroke={ACCENT}
+                  strokeWidth="1.2"
+                  pointerEvents="none"
+                />
+              )}
+
               {tool === "room" && points.length > 0 && (
                 <g pointerEvents="none">
                   <polyline
@@ -1417,9 +1799,44 @@ export default function PlanStudio() {
         </div>
 
         {/* Properties */}
-        {panelOpen && (
-          <aside className="absolute bottom-8 right-0 top-11 z-10 w-[280px] overflow-y-auto border-l border-[#2f3237] bg-[#202226] md:static md:shrink-0">
+        {
+          <aside
+            className={`absolute bottom-8 right-0 top-11 z-10 w-[280px] overflow-y-auto border-l border-[#2f3237] bg-[#202226] md:static md:shrink-0 ${
+              panelOpen === null ? "hidden md:block" : panelOpen ? "block" : "hidden"
+            }`}
+          >
             {selected && selectionPanel(selected)}
+
+            {selectedIds.length > 1 && (
+              <Section title={`${selectedIds.length} objects selected`}>
+                <div className="flex flex-wrap gap-1.5">
+                  <Btn onClick={duplicateSelected} title="Ctrl+D">
+                    Duplicate
+                  </Btn>
+                  <Btn onClick={() => rotateSelected(90)}>Rotate 90°</Btn>
+                  <Btn onClick={() => mirrorSelected("x")}>Mirror ↔</Btn>
+                  <Btn onClick={() => mirrorSelected("y")}>Mirror ↕</Btn>
+                  <Btn onClick={deleteSelected} danger>
+                    Delete
+                  </Btn>
+                </div>
+                <p className="text-[#8b9099]">Drag any selected object to move them all together.</p>
+              </Section>
+            )}
+
+            {tool === "rect" && (
+              <Section title="Rectangle tool">
+                <p className="text-[#b4b8c0]">Draw the rectangle as:</p>
+                <div className="flex flex-wrap gap-1.5">
+                  <Btn active={options.rectAs === "wall"} onClick={() => setOptions({ ...options, rectAs: "wall" })}>
+                    Four walls
+                  </Btn>
+                  <Btn active={options.rectAs === "line"} onClick={() => setOptions({ ...options, rectAs: "line" })}>
+                    Thin lines
+                  </Btn>
+                </div>
+              </Section>
+            )}
 
             {tool === "wall" && (
               <Section title="Wall tool">
@@ -1663,7 +2080,7 @@ export default function PlanStudio() {
               ))}
             </Section>
           </aside>
-        )}
+        }
       </div>
 
       {/* Command line and status */}
