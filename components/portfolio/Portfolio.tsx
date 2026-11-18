@@ -6,11 +6,12 @@ import PlanDrawing from "@/components/plan/PlanDrawing";
 import { safeFileName } from "@/lib/download";
 import { exportSvgElement } from "@/lib/exportSvg";
 import { loadPhoto } from "@/lib/image";
-import { VIEWS, buildElevation, type ViewId } from "@/lib/plan/elevation";
+import { VIEWS, buildElevation, roofOutline, type ViewId } from "@/lib/plan/elevation";
 import { extents } from "@/lib/plan/geometry";
 import { buildSection } from "@/lib/plan/section";
 import { getStyle } from "@/lib/plan/styles";
 import {
+  DEFAULT_ROOF,
   DEFAULT_SETTINGS,
   DEFAULT_STRUCTURE,
   GROUND_FLOOR,
@@ -55,6 +56,9 @@ const EMPTY: Sheet = {
   number: "01",
   panels: [blank("plan:g"), blank("elevation:front"), blank("section"), blank("text")],
 };
+
+type Book = { sheets: Sheet[]; current: number };
+const EMPTY_BOOK: Book = { sheets: [EMPTY], current: 0 };
 
 const SIZES: Record<string, [number, number]> = { A4: [297, 210], A3: [420, 297], A2: [594, 420], A1: [841, 594] };
 const PAPERS = [
@@ -134,7 +138,20 @@ function wrap(text: string, perLine: number): string[] {
 
 export default function Portfolio() {
   const { active } = useProjects();
-  const [sheet, saveSheet] = useSavedState(projectKey(WORK_KEYS.portfolio, active.id), EMPTY);
+  // A project can have several sheets; one is shown at a time.
+  const [saved, saveBook] = useSavedState<Partial<Book> & Partial<Sheet>>(
+    projectKey(WORK_KEYS.portfolio, active.id),
+    EMPTY_BOOK,
+  );
+  const sheets: Sheet[] =
+    Array.isArray(saved.sheets) && saved.sheets.length > 0
+      ? saved.sheets
+      : [{ ...EMPTY, ...(Array.isArray(saved.panels) ? (saved as Sheet) : {}) }]; // a sheet saved before there were several
+  const current = Math.min(Math.max(saved.current ?? 0, 0), sheets.length - 1);
+  const sheet: Sheet = { ...EMPTY, ...sheets[current] };
+  const update = (changes: Partial<Sheet>) =>
+    saveBook({ sheets: sheets.map((item, i) => (i === current ? { ...sheet, ...changes } : item)), current });
+  const number = (index: number) => String(index + 1).padStart(2, "0");
   const [savedPlan] = useSavedState<Partial<PlanDoc>>(projectKey(WORK_KEYS.plan, active.id), {});
   const [concept] = useSavedState<Record<string, unknown>>(projectKey(WORK_KEYS.concept, active.id), {});
   const svgRef = useRef<SVGSVGElement>(null);
@@ -149,7 +166,6 @@ export default function Portfolio() {
   const style = getStyle(plan.settings.style);
   const structure = { ...DEFAULT_STRUCTURE, ...(plan.settings.structure ?? {}) };
 
-  const update = (changes: Partial<Sheet>) => saveSheet({ ...sheet, ...changes });
   const layout = LAYOUTS.find((item) => item.id === sheet.layout) ?? LAYOUTS[0];
   const [long, short] = SIZES[sheet.size] ?? SIZES.A3;
   const W = sheet.portrait ? short : long;
@@ -229,8 +245,9 @@ export default function Portfolio() {
       const e = buildElevation(plan, panel.kind.slice(10) as ViewId);
       if (e.faces.length === 0) return null;
       const m = 1500;
+      const roof = roofOutline({ ...DEFAULT_ROOF, ...(plan.settings.roof ?? {}) }, e);
       return (
-        <svg {...frame} viewBox={`${e.minU - m} ${-e.top - m} ${e.maxU - e.minU + m * 2} ${e.top + m * 1.6}`} preserveAspectRatio="xMidYMid meet">
+        <svg {...frame} viewBox={`${e.minU - m} ${-e.top - roof.rise - m} ${e.maxU - e.minU + m * 2} ${e.top + roof.rise + m * 1.6}`} preserveAspectRatio="xMidYMid meet">
           {e.faces.map((face) => (
             <g key={face.id}>
               <rect x={face.u1} y={-face.z2} width={face.u2 - face.u1} height={face.z2 - face.z1} fill={sheet.paper} stroke={face.curved ? "none" : ink} strokeWidth="1.2" />
@@ -239,6 +256,7 @@ export default function Portfolio() {
               ))}
             </g>
           ))}
+          {roof.d && <path d={roof.d} fill={sheet.paper} stroke={ink} strokeWidth="1.4" strokeLinejoin="round" />}
           <line x1={e.minU - m} y1={0} x2={e.maxU + m} y2={0} stroke={ink} strokeWidth="2.5" />
         </svg>
       );
@@ -327,7 +345,57 @@ export default function Portfolio() {
         a section, a picture of your own, or text. Export it as a PDF or an image.
       </p>
 
-      <div className="mt-8 grid gap-5 lg:grid-cols-12">
+      {/* The sheets of this project */}
+      <div className="mt-8 flex flex-wrap items-center gap-2">
+        {sheets.map((item, index) => (
+          <button
+            key={index}
+            type="button"
+            aria-pressed={index === current}
+            onClick={() => saveBook({ sheets, current: index })}
+            className={`rounded-md border px-3.5 py-2 text-[15px] transition-colors ${
+              index === current ? "border-ink bg-ink text-paper" : "border-line hover:border-ink"
+            }`}
+          >
+            Sheet {item.number || number(index)}
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={() =>
+            saveBook({
+              sheets: [...sheets, { ...EMPTY, size: sheet.size, portrait: sheet.portrait, paper: sheet.paper, title: sheet.title, author: sheet.author, date: sheet.date, number: number(sheets.length) }],
+              current: sheets.length,
+            })
+          }
+          className="rounded-md border border-line px-3.5 py-2 text-[15px] transition-colors hover:border-ink"
+        >
+          + New sheet
+        </button>
+        <button
+          type="button"
+          onClick={() =>
+            saveBook({ sheets: [...sheets, { ...sheet, number: number(sheets.length) }], current: sheets.length })
+          }
+          className="rounded-md border border-line px-3.5 py-2 text-[15px] transition-colors hover:border-ink"
+        >
+          Duplicate
+        </button>
+        <button
+          type="button"
+          disabled={sheets.length < 2}
+          onClick={() => {
+            if (window.confirm("Delete this sheet? This cannot be undone.")) {
+              saveBook({ sheets: sheets.filter((_, i) => i !== current), current: Math.max(0, current - 1) });
+            }
+          }}
+          className="rounded-md border border-line px-3.5 py-2 text-[15px] text-muted transition-colors hover:border-ink hover:text-accent disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Delete sheet
+        </button>
+      </div>
+
+      <div className="mt-5 grid gap-5 lg:grid-cols-12">
         {/* The sheet */}
         <div className="self-start lg:col-span-8">
           <div className="overflow-hidden rounded-md border border-ink shadow-[8px_8px_0_0_var(--line)]">

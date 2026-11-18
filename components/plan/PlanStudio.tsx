@@ -21,10 +21,12 @@ import {
   arcPath,
   boxContains,
   boxTouches,
+  curvedWallCorners,
   dist,
   elemRect,
   entityBox,
   extents,
+  followCurves,
   mirrorEntity,
   offsetPoints,
   rotateEntity,
@@ -505,6 +507,10 @@ export default function PlanStudio() {
     for (const corner of wallJunctionCorners(walls)) {
       targets.push({ p: corner, kind: "Corner" });
     }
+    // The inside and outside corners at each end of a curved wall.
+    for (const wall of walls) {
+      for (const corner of curvedWallCorners(wall)) targets.push({ p: corner, kind: "Corner" });
+    }
     if (doc.site) {
       const { w, d } = doc.site;
       for (const p of [[0, 0], [w, 0], [w, d], [0, d]] as Pt[]) {
@@ -639,11 +645,12 @@ export default function PlanStudio() {
   }
 
   function finishRoom() {
-    if (points.length < 3) return;
+    // Two corners are enough when a curved wall closes the shape between them.
+    if (followCurves(points, walls).length < 3) return;
     const room: Room = {
       id: newId(),
       kind: "room",
-      pts: points,
+      pts: followCurves(points, walls), // hug any curved wall between corners
       name: `Room ${rooms.length + 1}`,
       finish: "none",
     };
@@ -1011,7 +1018,7 @@ export default function PlanStudio() {
   }
 
   function endCommand() {
-    if (tool === "room" && points.length >= 3) finishRoom();
+    if (tool === "room" && points.length >= 2) finishRoom();
     else setPoints([]);
     setBuffer("");
   }
@@ -1834,6 +1841,16 @@ export default function PlanStudio() {
           <Row label="Starts above floor">
             <NumInput value={entity.base} suffix="mm" onCommit={(base) => updateEntity({ ...entity, base })} />
           </Row>
+          {entity.type === "stair" && (
+            <div className="flex flex-wrap gap-1.5">
+              <Btn active={entity.turn !== "u"} onClick={() => updateEntity({ ...entity, turn: "" })}>
+                Straight flight
+              </Btn>
+              <Btn active={entity.turn === "u"} onClick={() => updateEntity({ ...entity, turn: "u" })}>
+                U-turn with landing
+              </Btn>
+            </div>
+          )}
           {entity.type === "stair" && (
             <p className="text-[#8b9099]">
               {Math.max(2, Math.round(entity.h / 170))} steps, each about{" "}

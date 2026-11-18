@@ -1,4 +1,5 @@
 import { memo } from "react";
+import { elemBlocks } from "@/lib/plan/elevation";
 import { getFurniture, type Part } from "@/lib/plan/furniture";
 import {
   add,
@@ -942,6 +943,26 @@ function PlanDrawing({
         const x = -length / 2;
         const y = -width / 2;
         const line = { stroke: style.ink, strokeWidth: 1.2, fill: "none" };
+        if (elem.type === "stair" && elem.turn === "u") {
+          // Each step and the landing, drawn in place.
+          return (
+            <g key={elem.id} data-id={elem.id} data-layer={layerOf(elem)}>
+              {elemBlocks(elem, 0).map((step, index) => (
+                <polygon key={index} points={pts(step.corners)} {...line} fill="transparent" strokeWidth="1" />
+              ))}
+              <text
+                x={elem.a[0]}
+                y={elem.a[1]}
+                fontSize={letter * 0.8}
+                fontFamily={FONT}
+                fill={style.text}
+                textAnchor="middle"
+              >
+                UP
+              </text>
+            </g>
+          );
+        }
         const steps = Math.max(2, Math.round(length / 280));
         return (
           <g

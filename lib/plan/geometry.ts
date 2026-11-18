@@ -262,6 +262,17 @@ export function elemRect(elem: Extract<Entity, { kind: "elem" }>): {
   if (elem.type === "column") {
     return { centre: elem.a, angle: 0, length: elem.w, width: elem.d };
   }
+  if (elem.type === "stair" && elem.turn === "u") {
+    // Two flights side by side, with a landing beyond the far end.
+    const d = unit(elem.a, elem.b);
+    const length = dist(elem.a, elem.b) + elem.w;
+    return {
+      centre: [elem.a[0] + (d[0] * length) / 2, elem.a[1] + (d[1] * length) / 2],
+      angle: Math.atan2(d[1], d[0]),
+      length,
+      width: elem.w * 2 + 100,
+    };
+  }
   if (elem.type === "slab") {
     return {
       centre: mid(elem.a, elem.b),
@@ -388,6 +399,66 @@ export function wallJoints(walls: Wall[]): { p: Pt; r: number }[] {
     }
   }
   return joints;
+}
+
+/** The four corner points at the ends of a curved wall (inner and outer face). */
+export function curvedWallCorners(wall: Wall): Pt[] {
+  const shape = wallShape(wall);
+  if (!shape.curved) return [];
+  const points: Pt[] = [];
+  for (const theta of [shape.start, shape.start + shape.sweep]) {
+    for (const radius of [shape.r - wall.t / 2, shape.r + wall.t / 2]) {
+      points.push([
+        Math.round((shape.c[0] + radius * Math.cos(theta)) * 10) / 10,
+        Math.round((shape.c[1] + radius * Math.sin(theta)) * 10) / 10,
+      ]);
+    }
+  }
+  return points;
+}
+
+/**
+ * Makes a traced room follow curved walls. Where two neighbouring corners of
+ * the room both sit on the same face of a curved wall, extra points are added
+ * along the curve between them, so the room's area is the true curved area.
+ */
+export function followCurves(points: Pt[], walls: Wall[]): Pt[] {
+  const curved = walls.filter((wall) => wall.m);
+  if (curved.length === 0) return points;
+  const result: Pt[] = [];
+  // A pair of corners follows a curve only once: the way back between the
+  // same two corners is the straight side (the chord) that closes the shape.
+  const done = new Set<string>();
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i];
+    const q = points[(i + 1) % points.length];
+    result.push(p);
+    const pair = [p.join(","), q.join(",")].sort().join("|");
+    if (done.has(pair)) continue;
+    for (const wall of curved) {
+      const shape = wallShape(wall);
+      if (!shape.curved) continue;
+      const radiusP = dist(p, shape.c);
+      const radiusQ = dist(q, shape.c);
+      const reach = wall.t / 2 + 6;
+      const onP = projectOnWall(p, wall);
+      const onQ = projectOnWall(q, wall);
+      if (Math.abs(radiusP - radiusQ) > 6 || onP.distance > reach || onQ.distance > reach) continue;
+      const steps = Math.ceil(Math.abs(onQ.along - onP.along) / 200);
+      const direction = shape.sweep > 0 ? 1 : -1;
+      done.add(pair);
+      for (let k = 1; k < steps; k++) {
+        const along = onP.along + ((onQ.along - onP.along) * k) / steps;
+        const theta = shape.start + (direction * along) / shape.r;
+        result.push([
+          Math.round(shape.c[0] + radiusP * Math.cos(theta)),
+          Math.round(shape.c[1] + radiusP * Math.sin(theta)),
+        ]);
+      }
+      break;
+    }
+  }
+  return result;
 }
 
 // --- Selecting by box --------------------------------------------------------

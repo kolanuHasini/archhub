@@ -347,6 +347,67 @@ function photoMaterial(name: string): THREE.MeshStandardMaterial {
   });
 }
 
+const trees = new Map<number, { leaves: THREE.MeshStandardMaterial; shadow: THREE.MeshDepthMaterial }>();
+
+/**
+ * A painted picture of a tree, with a see-through background. In the 3D view
+ * it is put on three crossed cards, which reads as a full tree from any side.
+ */
+export function treeMaterial(variant: number) {
+  const ready = trees.get(variant);
+  if (ready) return ready;
+  const canvas = document.createElement("canvas");
+  canvas.width = canvas.height = SIZE;
+  const c = canvas.getContext("2d");
+  const next = random(variant * 977 + 13);
+  if (c) {
+    // Trunk and a few branches.
+    c.strokeStyle = "#5b4330";
+    c.lineCap = "round";
+    c.lineWidth = 22;
+    c.beginPath();
+    c.moveTo(SIZE / 2, SIZE);
+    c.lineTo(SIZE / 2 + (next() - 0.5) * 20, SIZE * 0.52);
+    c.stroke();
+    for (let i = 0; i < 6; i++) {
+      c.lineWidth = 5 + next() * 6;
+      c.beginPath();
+      c.moveTo(SIZE / 2, SIZE * (0.5 + next() * 0.2));
+      c.lineTo(SIZE / 2 + (next() - 0.5) * SIZE * 0.6, SIZE * (0.2 + next() * 0.25));
+      c.stroke();
+    }
+    // Leaves: many small dabs gathered into clumps, lighter towards the top.
+    const greens = ["#2f4a2b", "#3e6136", "#4f7543", "#648b52", "#7da067"];
+    for (let clump = 0; clump < 46; clump++) {
+      const turn = next() * Math.PI * 2;
+      const out = Math.sqrt(next()) * SIZE * 0.36;
+      const cx = SIZE / 2 + Math.cos(turn) * out;
+      const cy = SIZE * 0.36 + Math.sin(turn) * out * 0.78;
+      const size = 26 + next() * 34;
+      for (let leaf = 0; leaf < 70; leaf++) {
+        const a = next() * Math.PI * 2;
+        const r = Math.sqrt(next()) * size;
+        const y = cy + Math.sin(a) * r;
+        const lift = Math.max(0, Math.min(4, Math.floor(((SIZE * 0.72 - y) / (SIZE * 0.72)) * 5 + next() * 1.6)));
+        c.fillStyle = greens[lift];
+        c.beginPath();
+        c.ellipse(cx + Math.cos(a) * r, y, 3 + next() * 4, 2 + next() * 3, next() * Math.PI, 0, Math.PI * 2);
+        c.fill();
+      }
+    }
+  }
+  const map = new THREE.CanvasTexture(canvas);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.anisotropy = 8;
+  const made = {
+    leaves: new THREE.MeshStandardMaterial({ map, alphaTest: 0.5, side: THREE.DoubleSide, roughness: 1 }),
+    // Lets the shadow take the shape of the leaves, not of the card.
+    shadow: new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking, map, alphaTest: 0.5 }),
+  };
+  trees.set(variant, made);
+  return made;
+}
+
 const cache = new Map<string, THREE.MeshStandardMaterial>();
 
 /** A realistic material by name. Made once, then reused. */

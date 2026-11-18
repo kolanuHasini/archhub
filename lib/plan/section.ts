@@ -140,6 +140,19 @@ export function buildSection(
     }
   }
 
+  // Slabs and the roof cover what is indoors: where rooms have been traced,
+  // they set the extent, so garden and boundary walls are left open to the sky.
+  for (const floor of floors) {
+    const indoors = entities.flatMap((e) =>
+      e.kind === "room" && ((e as { floor?: string }).floor ?? GROUND_FLOOR.id) === floor.id
+        ? e.pts
+        : [],
+    );
+    if (indoors.length === 0) continue;
+    const us = indoors.map(across);
+    reach.set(floor.id, { u1: Math.min(...us) - 115, u2: Math.max(...us) + 115 });
+  }
+
   // Columns, beams, slabs and stairs that the cut passes through.
   for (const elem of entities) {
     if (elem.kind !== "elem" || elem.type === "railing") continue;

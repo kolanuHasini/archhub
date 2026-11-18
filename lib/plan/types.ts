@@ -113,6 +113,7 @@ export type Elem = {
   d: number;
   base: number;
   h: number;
+  turn?: string; // stairs only: "u" = two flights with a landing between
 };
 
 export const ELEM_TYPES = [

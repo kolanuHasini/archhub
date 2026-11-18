@@ -174,17 +174,17 @@ export default function Elevations() {
   const drawingScale = scale ?? settings.scale;
   const letter = 2.5 * drawingScale;
   const elevation = useMemo(() => buildElevation(saved, view), [saved, view]);
-  const { faces, trees, floors, minU, maxU, top, bottom, depthSpan } = elevation;
+  const { faces, trees, floors, minU, maxU, top, bottom, depthSpan, roofU1, roofU2 } = elevation;
   const empty = faces.length === 0;
 
   // --- Roof ---------------------------------------------------------------------
   // The ridge normally runs along the building's longer side.
   const ridgeAcross = elevation.ridgeAlongView !== roof.turned; // ridge runs left-right here
   const over = roof.type === "flat" || roof.type === "none" ? 0 : roof.overhang;
-  const left = minU - over;
-  const right = maxU + over;
+  const left = roofU1 - over;
+  const right = roofU2 + over;
   const slope = Math.tan((Math.min(Math.max(roof.pitch, 1), 70) * Math.PI) / 180);
-  const span = (ridgeAcross ? depthSpan : maxU - minU) + over * 2;
+  const span = (ridgeAcross ? depthSpan : roofU2 - roofU1) + over * 2;
   let rise = 0;
   let roofShape = "";
   if (!empty) {
@@ -412,8 +412,8 @@ export default function Elevations() {
               {/* Roof */}
               {roof.type === "flat" && rise > 0 && (
                 <g>
-                  <rect x={minU} y={-top - rise} width={maxU - minU} height={rise} fill={wallFill} stroke={style.ink} strokeWidth="1.3" />
-                  <rect x={minU - 60} y={-top - rise - 80} width={maxU - minU + 120} height={80} fill={style.paper} stroke={style.ink} strokeWidth="1.3" />
+                  <rect x={roofU1} y={-top - rise} width={roofU2 - roofU1} height={rise} fill={wallFill} stroke={style.ink} strokeWidth="1.3" />
+                  <rect x={roofU1 - 60} y={-top - rise - 80} width={roofU2 - roofU1 + 120} height={80} fill={style.paper} stroke={style.ink} strokeWidth="1.3" />
                 </g>
               )}
               {roofShape && (

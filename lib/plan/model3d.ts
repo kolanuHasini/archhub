@@ -1,8 +1,9 @@
 import * as THREE from "three";
+import { elemBlocks } from "./elevation";
 import { getFurniture } from "./furniture";
 import { dist, elemRect, unit, wallPointAt, wallShape } from "./geometry";
 import { FINISH_COLOURS } from "./styles";
-import { material, measureBox } from "./textures3d";
+import { material, measureBox, treeMaterial } from "./textures3d";
 import {
   DEFAULT_ROOF,
   DEFAULT_STRUCTURE,
@@ -235,11 +236,19 @@ export function buildModel(
     if (elem.type === "column" || elem.type === "beam" || elem.type === "slab") {
       box(centre, angle, length, width, level, elem.h, real("concrete"), true);
     } else if (elem.type === "stair") {
-      // Each step is a block; they rise one after another along the run.
-      const steps = Math.max(2, Math.round(elem.h / 170));
-      const going = length / steps;
-      for (let i = 0; i < steps; i++) {
-        box(along((i + 0.5) * going), angle, going, width, level, ((i + 1) * elem.h) / steps, real("concrete"));
+      // Each step (and any landing) is a block, the same ones used in sections.
+      for (const step of elemBlocks(elem, levelFor(elem))) {
+        const [p0, p1, p2, p3] = step.corners;
+        const middle: Pt = [(p0[0] + p1[0] + p2[0] + p3[0]) / 4, (p0[1] + p1[1] + p2[1] + p3[1]) / 4];
+        box(
+          middle,
+          Math.atan2(p1[1] - p0[1], p1[0] - p0[0]),
+          dist(p0, p1),
+          dist(p1, p2),
+          step.z1,
+          step.z2 - step.z1,
+          real("concrete"),
+        );
       }
     } else if (elem.type === "railing") {
       const posts = Math.max(2, Math.round(length / 1200) + 1);
@@ -280,7 +289,45 @@ export function buildModel(
     const area = footprint(floor.id);
     if (!area) continue;
     const { x1, x2, y1, y2 } = area;
-    box([(x1 + x2) / 2, (y1 + y2) / 2], 0, x2 - x1, y2 - y1, floor.level - structure.slab, structure.slab, slabMaterial, true);
+    // A stair that arrives at this floor needs an opening in its slab.
+    const arriving = entities.filter(
+      (e): e is Extract<Entity, { kind: "elem" }> & { floor?: string } =>
+        e.kind === "elem" &&
+        e.type === "stair" &&
+        (e.floor ?? GROUND_FLOOR.id) !== floor.id &&
+        Math.abs(levelFor(e) + e.base + e.h - floor.level) < 250,
+    );
+    if (arriving.length === 0) {
+      box([(x1 + x2) / 2, (y1 + y2) / 2], 0, x2 - x1, y2 - y1, floor.level - structure.slab, structure.slab, slabMaterial, true);
+      continue;
+    }
+    const outline = new THREE.Shape([
+      new THREE.Vector2(x1 * M, y1 * M),
+      new THREE.Vector2(x2 * M, y1 * M),
+      new THREE.Vector2(x2 * M, y2 * M),
+      new THREE.Vector2(x1 * M, y2 * M),
+    ]);
+    for (const stair of arriving) {
+      const r = elemRect(stair);
+      const d: Pt = [Math.cos(r.angle), Math.sin(r.angle)];
+      const corner = (along: number, side: number) =>
+        new THREE.Vector2(
+          (r.centre[0] + d[0] * along - d[1] * side) * M,
+          (r.centre[1] + d[1] * along + d[0] * side) * M,
+        );
+      const l = r.length / 2 + 50;
+      const w = r.width / 2 + 50;
+      outline.holes.push(new THREE.Path([corner(-l, -w), corner(l, -w), corner(l, w), corner(-l, w)]));
+    }
+    const slab = new THREE.Mesh(
+      new THREE.ExtrudeGeometry(outline, { depth: structure.slab * M, bevelEnabled: false }),
+      slabMaterial,
+    );
+    slab.rotation.x = Math.PI / 2; // lay it flat; its thickness then runs downwards
+    slab.position.y = floor.level * M;
+    slab.castShadow = true;
+    slab.receiveShadow = true;
+    group.add(slab);
   }
 
   // Room floor finishes, laid just above the slab.
@@ -434,6 +481,22 @@ export function buildModel(
       const groundY = -structure.plinth * M;
       const x = tree.p[0] * M;
       const z = tree.p[1] * M;
+      if (!options.clay) {
+        // Three crossed cards carrying a painted tree.
+        const look = treeMaterial(seed % 4);
+        const wide = r * 2.5;
+        const tall = r * 3.4;
+        const lean = next() * Math.PI;
+        for (let k = 0; k < 3; k++) {
+          const card = new THREE.Mesh(new THREE.PlaneGeometry(wide, tall), look.leaves);
+          card.customDepthMaterial = look.shadow;
+          card.position.set(x, groundY + tall / 2, z);
+          card.rotation.y = lean + (k * Math.PI) / 3;
+          card.castShadow = true;
+          group.add(card);
+        }
+        continue;
+      }
       const stem = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.06, r * 0.11, r * 1.7, 10), trunk);
       stem.position.set(x, groundY + r * 0.85, z);
       stem.castShadow = true;
