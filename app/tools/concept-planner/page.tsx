@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 
 export default function ConceptPlannerPage() {
   return (
-    <div className="py-10 sm:py-14">
+    <div className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-8 sm:py-14">
       <Link
         href="/#studio-tools"
         className="font-mono text-xs text-muted hover:text-accent"

@@ -1,13 +1,73 @@
 {
-  "tagline": "A free toolkit for architecture students",
-  "intro": "Quick studio tools, a growing precedent library, and practical help for juries and portfolios. Free, open, and made by students.",
+  "tagline": "A free design studio for architects and students",
+  "headline": [
+    "From first idea",
+    "to final sheet."
+  ],
+  "intro": "ArchHub is a free design studio in your browser. Plan a concept, draw accurate floor plans, and build towards a portfolio, without installing anything.",
+  "stats": [
+    {
+      "value": "100%",
+      "label": "Free, no sign-up"
+    },
+    {
+      "value": "7",
+      "label": "Render styles"
+    },
+    {
+      "value": "DXF",
+      "label": "Works with AutoCAD"
+    },
+    {
+      "value": "∞",
+      "label": "Floors per building"
+    }
+  ],
+  "marquee": [
+    "Concept planning",
+    "Site study",
+    "Inspiration to form",
+    "Floor plans",
+    "Curved walls",
+    "Multiple floors",
+    "Layers and line weights",
+    "Dimensions and areas",
+    "Render styles",
+    "DXF in and out"
+  ],
   "flow": [
-    { "title": "Concept", "href": "/tools/concept-planner", "status": "live" },
-    { "title": "Floor plans", "href": "/studio/plan", "status": "live" },
-    { "title": "Elevations", "status": "soon" },
-    { "title": "Sections", "status": "soon" },
-    { "title": "3D views", "status": "soon" },
-    { "title": "Portfolio", "status": "soon" }
+    {
+      "title": "Concept",
+      "href": "/tools/concept-planner",
+      "status": "live",
+      "description": "Brief, site study, inspiration and a first sketch."
+    },
+    {
+      "title": "Floor plans",
+      "href": "/studio/plan",
+      "status": "live",
+      "description": "Walls, curves, floors, layers and dimensions at true scale."
+    },
+    {
+      "title": "Elevations",
+      "status": "soon",
+      "description": "Generated from your plan and wall heights."
+    },
+    {
+      "title": "Sections",
+      "status": "soon",
+      "description": "Cut a line through the plan and see inside."
+    },
+    {
+      "title": "3D views",
+      "status": "soon",
+      "description": "Orbit the model, set materials and sun."
+    },
+    {
+      "title": "Portfolio",
+      "status": "soon",
+      "description": "Lay out sheets and export a PDF."
+    }
   ],
   "sections": [
     {

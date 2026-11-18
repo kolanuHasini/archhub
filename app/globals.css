@@ -2,26 +2,26 @@
 
 /* ArchHub colours. Change these values to restyle the whole site. */
 :root {
-  --paper: #f7f5ef; /* page background */
-  --surface: #fffefa; /* cards */
-  --ink: #1b1b1b; /* main text */
-  --muted: #6a6a64; /* secondary text */
-  --line: #d6d2c6; /* thin borders */
-  --grid: rgba(31, 78, 156, 0.06); /* drafting grid */
-  --accent: #1f4e9c; /* blueprint blue */
+  --paper: #f3f2ee; /* page background */
+  --surface: #ffffff; /* cards */
+  --ink: #0d0d0e; /* main text */
+  --muted: #6b6b66; /* secondary text */
+  --line: #dcdad2; /* thin borders */
+  --grid: rgba(13, 13, 14, 0.055); /* drafting grid */
+  --accent: #1f4fd8; /* blueprint blue */
   --accent-ink: #ffffff; /* text on blue */
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --paper: #0e1726;
-    --surface: #142033;
-    --ink: #e9eef6;
-    --muted: #9aa7ba;
-    --line: #2a3a54;
-    --grid: rgba(140, 180, 255, 0.06);
-    --accent: #8db8ff;
-    --accent-ink: #0e1726;
+    --paper: #0c0d0f;
+    --surface: #15171a;
+    --ink: #f1f1ee;
+    --muted: #9a9a94;
+    --line: #2a2c30;
+    --grid: rgba(255, 255, 255, 0.05);
+    --accent: #7ea2ff;
+    --accent-ink: #0c0d0f;
   }
 }
 
@@ -37,11 +37,115 @@
   --font-mono: var(--font-geist-mono);
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   background-color: var(--paper);
+  color: var(--ink);
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+/* A fine drafting grid, used behind the hero and a few panels. */
+.drafting-grid {
   background-image:
     linear-gradient(var(--grid) 1px, transparent 1px),
     linear-gradient(90deg, var(--grid) 1px, transparent 1px);
-  background-size: 24px 24px;
-  color: var(--ink);
+  background-size: 32px 32px;
+}
+
+/* --- Motion ---------------------------------------------------------------- */
+
+/* Sections fade and rise into place as they scroll into view. */
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition:
+    opacity 0.9s cubic-bezier(0.2, 0.7, 0.2, 1),
+    transform 0.9s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+.reveal.in {
+  opacity: 1;
+  transform: none;
+}
+
+/* The headline rises line by line when the page opens. */
+@keyframes rise {
+  from {
+    transform: translateY(110%);
+  }
+  to {
+    transform: none;
+  }
+}
+.rise {
+  display: block;
+  overflow: hidden;
+}
+.rise > span {
+  display: block;
+  animation: rise 1s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+/* Lines that draw themselves, like a pen on paper. */
+@keyframes draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.draw {
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: draw 1.6s cubic-bezier(0.6, 0, 0.2, 1) forwards;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.fade-in {
+  animation: fade-in 0.8s ease both;
+}
+
+/* The scrolling strip of words. */
+@keyframes marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+.marquee {
+  animation: marquee 38s linear infinite;
+}
+.marquee:hover {
+  animation-play-state: paused;
+}
+
+/* People who ask their device for less motion get a still page. */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .rise > span,
+  .fade-in,
+  .marquee {
+    animation: none;
+  }
+  .draw {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
 }
