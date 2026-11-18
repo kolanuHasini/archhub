@@ -1,5 +1,16 @@
 import { getFurniture } from "./furniture";
-import { add, circleThrough, dist, mul, perp, sub, unit, wallCorners } from "./geometry";
+import {
+  add,
+  circleThrough,
+  dist,
+  mul,
+  perp,
+  sub,
+  unit,
+  wallCorners,
+  wallPointAt,
+  wallShape,
+} from "./geometry";
 import {
   newId,
   type Entity,
@@ -97,16 +108,46 @@ export function exportDxf(doc: PlanDoc): string {
 
   for (const entity of doc.entities) {
     switch (entity.kind) {
-      case "wall":
-        loop("WALLS", wallCorners(entity, walls));
+      case "wall": {
+        const shape = wallShape(entity);
+        if (!shape.curved) {
+          loop("WALLS", wallCorners(entity, walls));
+          break;
+        }
+        // A curved wall: two arcs (outer and inner face) and two end lines.
+        const end = shape.start + shape.sweep;
+        const degrees = (theta: number) => (((-theta * 180) / Math.PI) % 360 + 360) % 360;
+        const at = (radius: number, theta: number): Pt => [
+          shape.c[0] + radius * Math.cos(theta),
+          shape.c[1] + radius * Math.sin(theta),
+        ];
+        for (const radius of [shape.r + entity.t / 2, Math.max(shape.r - entity.t / 2, 1)]) {
+          put(0, "ARC");
+          put(8, "WALLS");
+          put(10, shape.c[0]);
+          put(20, -shape.c[1]);
+          put(40, radius);
+          // DXF arcs run anticlockwise, which is the opposite of clockwise on screen.
+          put(50, degrees(shape.sweep > 0 ? end : shape.start));
+          put(51, degrees(shape.sweep > 0 ? shape.start : end));
+        }
+        const outer = shape.r + entity.t / 2;
+        const inner = Math.max(shape.r - entity.t / 2, 1);
+        line("WALLS", at(outer, shape.start), at(inner, shape.start));
+        line("WALLS", at(outer, end), at(inner, end));
         break;
+      }
       case "door":
       case "window": {
         const wall = walls.find((w) => w.id === entity.wallId);
         if (!wall) break;
-        const d = unit(wall.a, wall.b);
+        const spot = wallPointAt(wall, entity.pos);
+        const d: Pt = [
+          Math.cos((spot.angle * Math.PI) / 180),
+          Math.sin((spot.angle * Math.PI) / 180),
+        ];
         const n = mul(perp(d), wall.t / 2);
-        const centre = add(wall.a, mul(d, entity.pos));
+        const centre = spot.p;
         const left = sub(centre, mul(d, entity.width / 2));
         const right = add(centre, mul(d, entity.width / 2));
         loop("OPENINGS", [add(left, n), add(right, n), sub(right, n), sub(left, n)]);

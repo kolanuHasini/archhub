@@ -10,6 +10,7 @@ export type Wall = {
   kind: "wall";
   a: Pt; // start of the wall's centre line
   b: Pt; // end of the wall's centre line
+  m?: Pt; // curved walls only: a point the centre line bends through
   t: number; // thickness
   h: number; // height (used later for elevations, sections and 3D)
 };

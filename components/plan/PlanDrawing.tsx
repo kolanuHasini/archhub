@@ -15,7 +15,9 @@ import {
   polygonArea,
   sub,
   unit,
-  wallCorners,
+  wallJoints,
+  wallOutline,
+  wallPointAt,
 } from "@/lib/plan/geometry";
 import { FINISH_COLOURS, getStyle, type PlanStyle } from "@/lib/plan/styles";
 import type {
@@ -339,8 +341,8 @@ function OpeningView({
   wall: Wall;
   style: PlanStyle;
 }) {
-  const d = unit(wall.a, wall.b);
-  const centre = add(wall.a, mul(d, opening.pos));
+  const spot = wallPointAt(wall, opening.pos);
+  const centre = spot.p;
   const w = opening.width;
   const t = wall.t;
   const half = w / 2;
@@ -474,14 +476,14 @@ function OpeningView({
   return (
     <g
       data-id={opening.id}
-      transform={`translate(${centre[0]} ${centre[1]}) rotate(${angleDeg(wall.a, wall.b)})`}
+      transform={`translate(${centre[0]} ${centre[1]}) rotate(${spot.angle})`}
     >
-      {/* Cut the gap out of the wall. */}
+      {/* Cut the gap out of the wall (a little deeper on a curved wall). */}
       <rect
         x={-half}
-        y={-t / 2}
+        y={wall.m ? -t * 0.62 : -t / 2}
         width={w}
-        height={t}
+        height={wall.m ? t * 1.24 : t}
         fill={style.paper}
         stroke={style.paper}
         strokeWidth={style.wallLineWidth * 2 + 1}
@@ -642,7 +644,8 @@ export default function PlanDrawing({
   const openings = doc.entities.filter(
     (e): e is Opening => e.kind === "door" || e.kind === "window",
   );
-  const corners = walls.map((wall) => ({ wall, points: wallCorners(wall, walls) }));
+  const outlines = walls.map((wall) => ({ wall, d: wallOutline(wall, walls) }));
+  const joints = wallJoints(walls);
   const shadowShift = `translate(${Math.max(...walls.map((w) => w.h), 3000) * 0.1} ${Math.max(...walls.map((w) => w.h), 3000) * 0.1})`;
 
   return (
@@ -715,8 +718,8 @@ export default function PlanDrawing({
         <g fill={style.shadow} stroke="none" pointerEvents="none">
           {show("walls") && (
             <g transform={shadowShift}>
-              {corners.map(({ wall, points }) => (
-                <polygon key={wall.id} points={pts(points)} />
+              {outlines.map(({ wall, d }) => (
+                <path key={wall.id} d={d} />
               ))}
             </g>
           )}
@@ -778,24 +781,41 @@ export default function PlanDrawing({
           walls which meet merge into one clean shape. */}
       {show("walls") && (
         <>
-          {corners.map(({ wall, points }) => (
-            <polygon
+          {outlines.map(({ wall, d }) => (
+            <path
               key={wall.id}
               data-id={wall.id}
-              points={pts(points)}
+              d={d}
               fill={style.wallFill}
               stroke={style.wallLine}
               strokeWidth={style.wallLineWidth * 2}
               strokeLinejoin="miter"
             />
           ))}
-          {corners.map(({ wall, points }) => (
-            <polygon
-              key={wall.id}
-              data-id={wall.id}
-              points={pts(points)}
+          {joints.map((joint, index) => (
+            <circle
+              key={index}
+              cx={joint.p[0]}
+              cy={joint.p[1]}
+              r={joint.r}
+              fill={style.wallFill}
+              stroke={style.wallLine}
+              strokeWidth={style.wallLineWidth * 2}
+              pointerEvents="none"
+            />
+          ))}
+          {outlines.map(({ wall, d }) => (
+            <path key={wall.id} data-id={wall.id} d={d} fill={style.wallFill} stroke="none" />
+          ))}
+          {joints.map((joint, index) => (
+            <circle
+              key={index}
+              cx={joint.p[0]}
+              cy={joint.p[1]}
+              r={joint.r}
               fill={style.wallFill}
               stroke="none"
+              pointerEvents="none"
             />
           ))}
         </>
@@ -829,7 +849,7 @@ export default function PlanDrawing({
             />
           ))}
           {settings.autoDims &&
-            walls.map((wall) => (
+            walls.filter((wall) => !wall.m).map((wall) => (
               <DimView
                 key={`auto-${wall.id}`}
                 a={wall.a}

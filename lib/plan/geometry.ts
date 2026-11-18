@@ -107,7 +107,8 @@ function wallFaces(wall: Wall): [Pt, Pt][] {
  * The inner and outer corner points where walls meet. Snapping to these lets
  * a room be traced along the inside faces, so its area is the true floor area.
  */
-export function wallJunctionCorners(walls: Wall[]): Pt[] {
+export function wallJunctionCorners(allWalls: Wall[]): Pt[] {
+  const walls = allWalls.filter((wall) => !wall.m); // straight walls only
   const corners: Pt[] = [];
   for (let i = 0; i < walls.length; i++) {
     for (let j = i + 1; j < walls.length; j++) {
@@ -145,6 +146,12 @@ export function wallJunctionCorners(walls: Wall[]): Pt[] {
 function mapPoints(entity: Entity, change: (p: Pt) => Pt): Entity {
   switch (entity.kind) {
     case "wall":
+      return {
+        ...entity,
+        a: change(entity.a),
+        b: change(entity.b),
+        ...(entity.m ? { m: change(entity.m) } : {}),
+      };
     case "line":
     case "dim":
       return { ...entity, a: change(entity.a), b: change(entity.b) };
@@ -242,6 +249,118 @@ export function arcPath(a: Pt, m: Pt, b: Pt): string {
   return `M ${a[0]} ${a[1]} A ${circle.r} ${circle.r} 0 ${large} ${sweep} ${b[0]} ${b[1]}`;
 }
 
+// --- Curved walls ------------------------------------------------------------
+//
+// A wall is curved when it has a third point, m, that its centre line passes
+// through. Angles here are in radians and increase clockwise on screen.
+
+export type WallShape =
+  | { curved: false; length: number }
+  | {
+      curved: true;
+      c: Pt; // centre of the curve
+      r: number; // radius of the centre line
+      start: number; // angle of the start point
+      sweep: number; // angle travelled from start to end (negative = anticlockwise)
+      length: number; // length along the curve
+    };
+
+export function wallShape(wall: Wall): WallShape {
+  if (wall.m) {
+    const circle = circleThrough(wall.a, wall.m, wall.b);
+    if (circle && circle.r < 1e6) {
+      const { c, r } = circle;
+      const start = Math.atan2(wall.a[1] - c[1], wall.a[0] - c[0]);
+      const end = Math.atan2(wall.b[1] - c[1], wall.b[0] - c[0]);
+      const turn =
+        (wall.m[0] - wall.a[0]) * (wall.b[1] - wall.m[1]) -
+        (wall.m[1] - wall.a[1]) * (wall.b[0] - wall.m[0]);
+      let sweep = end - start;
+      if (turn > 0) while (sweep <= 0) sweep += Math.PI * 2;
+      else while (sweep >= 0) sweep -= Math.PI * 2;
+      return { curved: true, c, r, start, sweep, length: r * Math.abs(sweep) };
+    }
+  }
+  return { curved: false, length: dist(wall.a, wall.b) };
+}
+
+export const wallLength = (wall: Wall) => wallShape(wall).length;
+
+/** The point a given distance along a wall, and the wall's direction there. */
+export function wallPointAt(wall: Wall, along: number): { p: Pt; angle: number } {
+  const shape = wallShape(wall);
+  if (!shape.curved) {
+    return {
+      p: add(wall.a, mul(unit(wall.a, wall.b), along)),
+      angle: angleDeg(wall.a, wall.b),
+    };
+  }
+  const direction = shape.sweep > 0 ? 1 : -1;
+  const theta = shape.start + (direction * along) / shape.r;
+  return {
+    p: [shape.c[0] + shape.r * Math.cos(theta), shape.c[1] + shape.r * Math.sin(theta)],
+    angle: (theta * 180) / Math.PI + direction * 90,
+  };
+}
+
+/** The closest point on a wall's centre line, straight or curved. */
+export function projectOnWall(p: Pt, wall: Wall) {
+  const shape = wallShape(wall);
+  if (!shape.curved) return project(p, wall.a, wall.b);
+  const full = Math.PI * 2;
+  const direction = shape.sweep > 0 ? 1 : -1;
+  const size = Math.abs(shape.sweep);
+  const theta = Math.atan2(p[1] - shape.c[1], p[0] - shape.c[0]);
+  // How far round from the start, measured the way the wall runs.
+  let travelled = (((theta - shape.start) * direction) % full + full) % full;
+  if (travelled > size) {
+    // Beyond the wall: use whichever end is nearer.
+    travelled = travelled - size < full - travelled ? size : 0;
+  }
+  const along = travelled * shape.r;
+  const point = wallPointAt(wall, along).p;
+  return { along, point, distance: dist(p, point) };
+}
+
+/** The outline of a wall as an SVG path. */
+export function wallOutline(wall: Wall, walls: Wall[]): string {
+  const shape = wallShape(wall);
+  if (!shape.curved) {
+    const corners = wallCorners(wall, walls);
+    return `M ${corners.map((p) => `${p[0]} ${p[1]}`).join(" L ")} Z`;
+  }
+  const outer = shape.r + wall.t / 2;
+  const inner = Math.max(shape.r - wall.t / 2, 1);
+  const end = shape.start + shape.sweep;
+  const at = (radius: number, theta: number) =>
+    `${shape.c[0] + radius * Math.cos(theta)} ${shape.c[1] + radius * Math.sin(theta)}`;
+  const large = Math.abs(shape.sweep) > Math.PI ? 1 : 0;
+  const flag = shape.sweep > 0 ? 1 : 0;
+  return (
+    `M ${at(outer, shape.start)} A ${outer} ${outer} 0 ${large} ${flag} ${at(outer, end)} ` +
+    `L ${at(inner, end)} A ${inner} ${inner} 0 ${large} ${1 - flag} ${at(inner, shape.start)} Z`
+  );
+}
+
+/**
+ * Round fillers where a curved wall meets another wall, so the join closes
+ * up without a notch.
+ */
+export function wallJoints(walls: Wall[]): { p: Pt; r: number }[] {
+  const joints: { p: Pt; r: number }[] = [];
+  for (const wall of walls) {
+    if (!wall.m) continue;
+    for (const end of [wall.a, wall.b]) {
+      const meets = walls.some(
+        (other) =>
+          other.id !== wall.id && (dist(other.a, end) < TOUCH || dist(other.b, end) < TOUCH),
+      );
+      if (meets) joints.push({ p: end, r: wall.t / 2 });
+    }
+  }
+  return joints;
+}
+
 // --- Selecting by box --------------------------------------------------------
 
 /** The rectangle around one object. */
@@ -255,6 +374,7 @@ export function entityBox(entity: Entity, walls: Wall[]): Box {
   switch (entity.kind) {
     case "wall":
       wallCorners(entity, []).forEach((p) => take(p));
+      if (entity.m) take(entity.m, entity.t / 2);
       break;
     case "line":
     case "dim":
@@ -288,9 +408,7 @@ export function entityBox(entity: Entity, walls: Wall[]): Box {
     case "door":
     case "window": {
       const wall = walls.find((w) => w.id === entity.wallId);
-      if (wall) {
-        take(add(wall.a, mul(unit(wall.a, wall.b), entity.pos)), entity.width / 2);
-      }
+      if (wall) take(wallPointAt(wall, entity.pos).p, entity.width / 2);
       break;
     }
   }
@@ -341,6 +459,7 @@ export function extents(doc: PlanDoc): Box {
       case "wall":
         take(entity.a, entity.t);
         take(entity.b, entity.t);
+        if (entity.m) take(entity.m, entity.t);
         break;
       case "line":
         take(entity.a);

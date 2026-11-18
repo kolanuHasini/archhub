@@ -35,11 +35,15 @@ import {
   mul,
   parseLength,
   polygonArea,
-  project,
+  projectOnWall,
   roundPt,
   unit,
   wallCorners,
   wallJunctionCorners,
+  wallLength,
+  wallOutline,
+  wallPointAt,
+  wallShape,
   type Box,
 } from "@/lib/plan/geometry";
 import { PLAN_STYLES, getStyle } from "@/lib/plan/styles";
@@ -81,6 +85,7 @@ type ToolId =
   | "select"
   | "pan"
   | "wall"
+  | "cwall"
   | "door"
   | "window"
   | "room"
@@ -98,6 +103,7 @@ const TOOLS: { id: ToolId; label: string; key: string; group: string }[] = [
   { id: "select", label: "Select", key: "V", group: "Edit" },
   { id: "pan", label: "Pan", key: "H", group: "Edit" },
   { id: "wall", label: "Wall", key: "W", group: "Build" },
+  { id: "cwall", label: "Curved wall", key: "U", group: "Build" },
   { id: "door", label: "Door", key: "D", group: "Build" },
   { id: "window", label: "Window", key: "N", group: "Build" },
   { id: "room", label: "Room", key: "R", group: "Build" },
@@ -317,7 +323,14 @@ export default function PlanStudio() {
       if (entity.kind === "wall" || entity.kind === "line") {
         targets.push({ p: entity.a, kind: "Endpoint", owner: entity.id });
         targets.push({ p: entity.b, kind: "Endpoint", owner: entity.id });
-        targets.push({ p: mid(entity.a, entity.b), kind: "Midpoint", owner: entity.id });
+        targets.push({
+          p:
+            entity.kind === "wall"
+              ? wallPointAt(entity, wallLength(entity) / 2).p
+              : mid(entity.a, entity.b),
+          kind: "Midpoint",
+          owner: entity.id,
+        });
       } else if (entity.kind === "arc") {
         targets.push({ p: entity.a, kind: "Endpoint", owner: entity.id });
         targets.push({ p: entity.b, kind: "Endpoint", owner: entity.id });
@@ -367,7 +380,7 @@ export default function PlanStudio() {
     if (settings.snap) {
       for (const wall of walls) {
         if (exclude === wall.id) continue;
-        const hit = project(raw, wall.a, wall.b);
+        const hit = projectOnWall(raw, wall);
         if (hit.distance < reach * 0.8) return { p: roundPt(hit.point), kind: "On wall" };
       }
       return { p: [Math.round(raw[0] / 50) * 50, Math.round(raw[1] / 50) * 50], kind: null };
@@ -468,9 +481,9 @@ export default function PlanStudio() {
     let best: { wallId: string; pos: number } | null = null;
     let bestDistance = Infinity;
     for (const wall of walls) {
-      const length = dist(wall.a, wall.b);
+      const length = wallLength(wall);
       if (length < width) continue;
-      const hit = project(raw, wall.a, wall.b);
+      const hit = projectOnWall(raw, wall);
       if (hit.distance < wall.t / 2 + 16 * px && hit.distance < bestDistance) {
         bestDistance = hit.distance;
         const pos = Math.min(
@@ -557,7 +570,27 @@ export default function PlanStudio() {
     const snapped = snapPoint(raw, from, event.shiftKey);
     const p = snapped.p;
 
-    if (tool === "wall" || tool === "line") {
+    if (tool === "cwall") {
+      if (points.length === 0) {
+        setPoints([p]);
+      } else if (points.length === 1) {
+        if (dist(points[0], p) >= 10) setPoints([points[0], p]);
+      } else {
+        commit([
+          ...doc.entities,
+          {
+            id: newId(),
+            kind: "wall",
+            a: points[0],
+            b: points[1],
+            m: p,
+            t: settings.wallT,
+            h: settings.wallH,
+          },
+        ]);
+        setPoints([points[1]]); // carry on from where this wall ended
+      }
+    } else if (tool === "wall" || tool === "line") {
       if (points.length === 0) setPoints([p]);
       else addSegment(points[0], p);
     } else if (tool === "room") {
@@ -686,8 +719,8 @@ export default function PlanStudio() {
       if (original.kind === "door" || original.kind === "window") {
         const wall = walls.find((w) => w.id === original.wallId);
         if (!wall) return;
-        const length = dist(wall.a, wall.b);
-        const along = project(raw, wall.a, wall.b).along;
+        const length = wallLength(wall);
+        const along = projectOnWall(raw, wall).along;
         const pos = Math.min(
           Math.max(Math.round(along / 10) * 10, original.width / 2),
           length - original.width / 2,
@@ -709,7 +742,9 @@ export default function PlanStudio() {
       const original = drag.original;
       const snapped = snapPoint(raw, null, event.shiftKey, original.id);
       setCursor(snapped);
-      if (original.kind === "wall" || original.kind === "line" || original.kind === "dim") {
+      if (original.kind === "wall" && drag.grip === "m") {
+        setOverride({ ...original, m: snapped.p });
+      } else if (original.kind === "wall" || original.kind === "line" || original.kind === "dim") {
         setOverride(
           drag.grip === "a" ? { ...original, a: snapped.p } : { ...original, b: snapped.p },
         );
@@ -916,8 +951,18 @@ export default function PlanStudio() {
   // A parallel copy of a wall or line, like AutoCAD's OFFSET.
   function offsetSelected(distance: number) {
     if (!selected || (selected.kind !== "wall" && selected.kind !== "line")) return;
-    const [a, b] = offsetPoints(selected.a, selected.b, distance);
-    const copy: Entity = { ...selected, id: newId(), a, b };
+    let copy: Entity;
+    const shape = selected.kind === "wall" ? wallShape(selected) : null;
+    if (selected.kind === "wall" && selected.m && shape?.curved) {
+      // A curved wall is offset by growing or shrinking its radius.
+      const scale = Math.max((shape.r + distance) / shape.r, 0.05);
+      const grow = (p: Pt): Pt =>
+        roundPt([shape.c[0] + (p[0] - shape.c[0]) * scale, shape.c[1] + (p[1] - shape.c[1]) * scale]);
+      copy = { ...selected, id: newId(), a: grow(selected.a), b: grow(selected.b), m: grow(selected.m) };
+    } else {
+      const [a, b] = offsetPoints(selected.a, selected.b, distance);
+      copy = { ...selected, id: newId(), a, b };
+    }
     commit([...doc.entities, copy]);
     setSelectedId(copy.id);
   }
@@ -1104,7 +1149,13 @@ export default function PlanStudio() {
     prompt = ["ARC: click the start point.", "Click the end point.", "Click a point the arc should pass through."][points.length];
   }
   else if (tool === "pan") prompt = "Drag to move around the drawing. Scroll to zoom.";
-  else if (tool === "wall" || tool === "line") {
+  else if (tool === "cwall") {
+    prompt = [
+      "CURVED WALL: click the start point.",
+      "Click the end point.",
+      "Click a point the wall should bend through. The next wall then starts from this one's end; Esc to finish.",
+    ][Math.min(points.length, 2)];
+  } else if (tool === "wall" || tool === "line") {
     prompt =
       points.length === 0
         ? `${tool === "wall" ? "WALL" : "LINE"}: click the start point.`
@@ -1177,9 +1228,10 @@ export default function PlanStudio() {
     if (selected.kind === "wall") {
       selectionMark = (
         <>
-          <polygon points={wallCorners(selected, []).map((p) => p.join(",")).join(" ")} {...mark} />
+          <path d={wallOutline(selected, [])} {...mark} />
           {grip(selected.a, "a")}
           {grip(selected.b, "b")}
+          {selected.m && grip(selected.m, "m")}
         </>
       );
     } else if (selected.kind === "line" || selected.kind === "dim") {
@@ -1239,14 +1291,15 @@ export default function PlanStudio() {
     } else {
       const wall = walls.find((w) => w.id === selected.wallId);
       if (wall) {
-        const centre = add(wall.a, mul(unit(wall.a, wall.b), selected.pos));
+        const spot = wallPointAt(wall, selected.pos);
+        const centre = spot.p;
         selectionMark = (
           <rect
             x={-selected.width / 2 - 4 * px}
             y={-wall.t / 2 - 4 * px}
             width={selected.width + 8 * px}
             height={wall.t + 8 * px}
-            transform={`translate(${centre[0]} ${centre[1]}) rotate(${angleDeg(wall.a, wall.b)})`}
+            transform={`translate(${centre[0]} ${centre[1]}) rotate(${spot.angle})`}
             {...mark}
           />
         );
@@ -1313,19 +1366,53 @@ export default function PlanStudio() {
       );
     }
     if (entity.kind === "wall") {
-      const length = dist(entity.a, entity.b);
+      const shape = wallShape(entity);
       return (
-        <Section title="Wall">
-          <Row label="Length">
-            <NumInput
-              value={Math.round(length)}
-              min={10}
-              suffix="mm"
-              onCommit={(value) =>
-                updateEntity({ ...entity, b: roundPt(add(entity.a, mul(unit(entity.a, entity.b), value))) })
-              }
-            />
-          </Row>
+        <Section title={shape.curved ? "Curved wall" : "Wall"}>
+          {shape.curved ? (
+            <>
+              <Row label="Length along curve">
+                <span className="text-[#e6e8ec]">{formatLength(shape.length, settings.unit)}</span>
+              </Row>
+              <Row label="Radius (centre line)">
+                <span className="text-[#e6e8ec]">{formatLength(shape.r, settings.unit)}</span>
+              </Row>
+              <Btn
+                onClick={() =>
+                  updateEntity({ id: entity.id, kind: "wall", a: entity.a, b: entity.b, t: entity.t, h: entity.h })
+                }
+              >
+                Make straight
+              </Btn>
+            </>
+          ) : (
+            <>
+              <Row label="Length">
+                <NumInput
+                  value={Math.round(shape.length)}
+                  min={10}
+                  suffix="mm"
+                  onCommit={(value) =>
+                    updateEntity({ ...entity, b: roundPt(add(entity.a, mul(unit(entity.a, entity.b), value))) })
+                  }
+                />
+              </Row>
+              <Btn
+                onClick={() => {
+                  // Start with a gentle bend to one side; drag the middle square to adjust.
+                  const d = unit(entity.a, entity.b);
+                  const middle = mid(entity.a, entity.b);
+                  const bulge = shape.length * 0.2;
+                  updateEntity({
+                    ...entity,
+                    m: roundPt([middle[0] - d[1] * bulge, middle[1] + d[0] * bulge]),
+                  });
+                }}
+              >
+                Make curved
+              </Btn>
+            </>
+          )}
           <Row label="Thickness">
             <NumInput value={entity.t} min={20} suffix="mm" onCommit={(t) => updateEntity({ ...entity, t })} />
           </Row>
@@ -1339,7 +1426,9 @@ export default function PlanStudio() {
             <Btn onClick={() => offsetSelected(options.offset)}>Offset one side</Btn>
             <Btn onClick={() => offsetSelected(-options.offset)}>Offset other side</Btn>
           </div>
-          <p className="text-[#8b9099]">Drag the blue squares to move either end.</p>
+          <p className="text-[#8b9099]">
+            Drag the blue squares to move either end{entity.m ? ", or the middle one to change the bend" : ""}.
+          </p>
           {actions}
         </Section>
       );
@@ -1669,6 +1758,24 @@ export default function PlanStudio() {
                 />
               )}
 
+              {tool === "cwall" && points.length > 0 && cursor && (
+                <path
+                  d={
+                    points.length === 1
+                      ? `M ${points[0].join(" ")} L ${cursor.p.join(" ")}`
+                      : wallOutline(
+                          { id: "preview", kind: "wall", a: points[0], b: points[1], m: cursor.p, t: settings.wallT, h: 0 },
+                          [],
+                        )
+                  }
+                  fill={ACCENT}
+                  fillOpacity="0.18"
+                  stroke={ACCENT}
+                  strokeWidth="1.2"
+                  pointerEvents="none"
+                />
+              )}
+
               {tool === "rect" && points.length > 0 && cursor && (
                 <g pointerEvents="none">
                   <rect
@@ -1743,7 +1850,7 @@ export default function PlanStudio() {
                   y={-hoverWall.t / 2}
                   width={tool === "door" ? options.doorWidth : options.windowWidth}
                   height={hoverWall.t}
-                  transform={`translate(${add(hoverWall.a, mul(unit(hoverWall.a, hoverWall.b), hoverOpening.pos)).join(" ")}) rotate(${angleDeg(hoverWall.a, hoverWall.b)})`}
+                  transform={`translate(${wallPointAt(hoverWall, hoverOpening.pos).p.join(" ")}) rotate(${wallPointAt(hoverWall, hoverOpening.pos).angle})`}
                   fill={ACCENT}
                   fillOpacity="0.5"
                   stroke={ACCENT}
@@ -1838,7 +1945,7 @@ export default function PlanStudio() {
               </Section>
             )}
 
-            {tool === "wall" && (
+            {(tool === "wall" || tool === "cwall") && (
               <Section title="Wall tool">
                 <div className="flex flex-wrap gap-1.5">
                   {WALL_THICKNESSES.map((t) => (
