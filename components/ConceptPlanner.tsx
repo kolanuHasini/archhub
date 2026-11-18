@@ -1,6 +1,14 @@
 "use client";
 
+import Link from "next/link";
 import { useRef } from "react";
+import SiteStudy, {
+  EMPTY_SITE,
+  siteArea,
+  sitePosition,
+  type SiteOptions,
+  type SiteValues,
+} from "@/components/SiteStudy";
 import SketchPad, { EMPTY_SKETCH, type Sketch } from "@/components/SketchPad";
 import { downloadBlob, safeFileName } from "@/lib/download";
 import { useSavedState } from "@/lib/useSavedState";
@@ -14,7 +22,7 @@ type Driver = {
   diagrams: string[];
 };
 
-type Plan = {
+type Plan = SiteValues & {
   name: string;
   type: string;
   users: string;
@@ -27,6 +35,7 @@ type Plan = {
 };
 
 const EMPTY_PLAN: Plan = {
+  ...EMPTY_SITE,
   name: "",
   type: "",
   users: "",
@@ -87,6 +96,16 @@ function draftStatement(
     );
   }
 
+  const area = siteArea(plan);
+  if (plan.facing || area !== null) {
+    let site = "The site";
+    if (area !== null) site += ` covers about ${area.toLocaleString()} m²`;
+    if (plan.facing) {
+      site += `${area !== null ? " and" : ""} faces ${plan.facing.toLowerCase()}`;
+    }
+    sentences.push(`${site}.`);
+  }
+
   if (plan.siteNotes.trim()) {
     sentences.push(
       endSentence(`On the site, it responds to ${plan.siteNotes.trim()}`),
@@ -101,6 +120,8 @@ function buildSummary(
   climate: Climate | undefined,
   drivers: Driver[],
 ): string {
+  const area = siteArea(plan);
+  const position = sitePosition(plan);
   const lines = [
     `CONCEPT PLAN: ${plan.name || "Untitled project"}`,
     "",
@@ -108,10 +129,27 @@ function buildSummary(
     `Project type: ${plan.type || "-"}`,
     `Who it is for: ${plan.users || "-"}`,
     "",
-    "2. SITE AND CLIMATE",
+    "2. SITE STUDY",
     `Location: ${plan.location || "-"}`,
+    `Map position: ${position ? `${position[0]}, ${position[1]}` : "-"}`,
+    `Size: ${plan.siteWidth || "-"} m wide x ${plan.siteDepth || "-"} m deep`,
+    `Area: ${area !== null ? `${area} m2` : "-"}`,
+    `Road width: ${plan.roadWidth ? `${plan.roadWidth} m` : "-"}`,
+    `Site faces: ${plan.facing || "-"}`,
+    `Slope: ${plan.slope || "-"}`,
+    `Wind mostly from: ${plan.wind || "-"}`,
+    `Vegetation: ${plan.vegetation || "-"}`,
+    `Vegetation notes: ${plan.vegetationNotes || "-"}`,
+    `North side: ${plan.north || "-"}`,
+    `East side: ${plan.east || "-"}`,
+    `South side: ${plan.south || "-"}`,
+    `West side: ${plan.west || "-"}`,
     `Climate: ${climate?.label ?? "-"}`,
     `Site notes: ${plan.siteNotes || "-"}`,
+    "Site documentation done:",
+    ...(plan.siteChecklist.length > 0
+      ? plan.siteChecklist.map((item) => `  [x] ${item}`)
+      : ["  -"]),
   ];
   if (climate) {
     lines.push("Climate strategies to consider:");
@@ -145,7 +183,7 @@ const fieldClass =
 
 const STEP_TITLES = [
   "Brief",
-  "Site and climate",
+  "Site study",
   "Design drivers",
   "Concept sketch",
   "Concept statement",
@@ -159,21 +197,21 @@ function readProjectFile(
     const data = JSON.parse(text);
     if (!data || data.app !== "archhub" || data.kind !== "concept") return null;
     const source = (data.plan ?? {}) as Record<string, unknown>;
-    const text_ = (key: keyof Plan) =>
-      typeof source[key] === "string" ? (source[key] as string) : "";
-    const plan: Plan = {
-      name: text_("name"),
-      type: text_("type"),
-      users: text_("users"),
-      location: text_("location"),
-      climate: text_("climate"),
-      siteNotes: text_("siteNotes"),
-      bigIdea: text_("bigIdea"),
-      statement: text_("statement"),
-      drivers: Array.isArray(source.drivers)
-        ? source.drivers.filter((item): item is string => typeof item === "string")
-        : [],
-    };
+    // Copy each known field, but only if it is the right kind of value.
+    const fields: Record<string, string | string[]> = { ...EMPTY_PLAN };
+    for (const key of Object.keys(EMPTY_PLAN)) {
+      const value = source[key];
+      if (Array.isArray(fields[key])) {
+        if (Array.isArray(value)) {
+          fields[key] = value.filter(
+            (item): item is string => typeof item === "string",
+          );
+        }
+      } else if (typeof value === "string") {
+        fields[key] = value;
+      }
+    }
+    const plan = fields as unknown as Plan;
     const shapes = Array.isArray(data.sketch?.shapes) ? data.sketch.shapes : [];
     return { plan, sketch: { shapes } };
   } catch {
@@ -216,6 +254,18 @@ function Step({
         </span>
       </div>
       <div className="space-y-5 p-4 sm:p-6">{children}</div>
+      <div className="flex justify-end border-t border-line p-4 sm:px-6">
+        <a
+          href={index + 1 < STEP_TITLES.length ? `#step-${index + 2}` : "#save"}
+          className="bg-accent px-5 py-2.5 text-sm font-medium text-accent-ink hover:opacity-90"
+        >
+          Next:{" "}
+          {index + 1 < STEP_TITLES.length
+            ? STEP_TITLES[index + 1]
+            : "Save and send"}{" "}
+          →
+        </a>
+      </div>
     </section>
   );
 }
@@ -224,10 +274,12 @@ export default function ConceptPlanner({
   projectTypes,
   climates,
   drivers,
+  siteOptions,
 }: {
   projectTypes: string[];
   climates: Climate[];
   drivers: Driver[];
+  siteOptions: SiteOptions;
 }) {
   const [plan, savePlan, resetPlan] = useSavedState(STORAGE_KEY, EMPTY_PLAN);
   const [sketch, saveSketch, resetSketch] = useSavedState(
@@ -248,7 +300,7 @@ export default function ConceptPlanner({
 
   const stepsDone = [
     plan.name.trim() !== "" && plan.type !== "",
-    plan.location.trim() !== "" && plan.climate !== "",
+    plan.location.trim() !== "" && plan.climate !== "" && plan.facing !== "",
     chosenDrivers.length > 0,
     hasSketch,
     plan.statement.trim() !== "",
@@ -366,9 +418,11 @@ export default function ConceptPlanner({
           </li>
           <li>
             In <strong>Concept sketch</strong>, choose a tool (Pen, Line,
-            Arrow, Box, Circle, Text), then click and drag on the white sheet.
-            Use <strong>Move</strong> to drag a shape and{" "}
-            <strong>Eraser</strong> to remove one. Undo is always available.
+            Curve, Arrow, Box, Circle, Text), then click and drag on the white
+            sheet. Use <strong>Select</strong> to move a shape or make it
+            bigger or smaller, and <strong>Eraser</strong> to remove one.
+            Prefer paper? Draw by hand, take a photo, and press{" "}
+            <strong>Add photo of a paper sketch</strong>.
           </li>
           <li>
             In <strong>Concept statement</strong>, press the blue button for a
@@ -461,7 +515,7 @@ export default function ConceptPlanner({
 
       <Step
         index={1}
-        hint="A strong concept grows out of its place."
+        hint="A strong concept grows out of its place. Record the site properly: where it is, its size, which way it faces, and what is on and around it."
         done={stepsDone[1]}
       >
         <div>
@@ -507,7 +561,13 @@ export default function ConceptPlanner({
             </ul>
           </div>
         )}
-        <div>
+        <SiteStudy
+          values={plan}
+          location={plan.location}
+          options={siteOptions}
+          onChange={update}
+        />
+        <div className="border-t border-line pt-5">
           <label htmlFor="cp-site" className={labelClass}>
             What is special about the site?
           </label>
@@ -678,6 +738,25 @@ export default function ConceptPlanner({
             className="hidden"
           />
         </div>
+      </section>
+
+      <section className="border border-dashed border-line bg-surface/60 p-4 sm:p-6">
+        <p className="font-mono text-xs uppercase tracking-widest text-accent">
+          Next stage
+        </p>
+        <h2 className="mt-1 text-xl font-semibold tracking-tight">
+          Floor plans
+        </h2>
+        <p className="mt-1 text-sm text-muted">
+          Coming soon: turn this concept into a floor plan with walls, doors,
+          windows and furniture. Save your project file now so it is ready.
+        </p>
+        <Link
+          href="/#studio-tools"
+          className="mt-4 inline-block border border-ink px-5 py-2.5 text-sm font-medium hover:border-accent hover:text-accent"
+        >
+          Back to all tools →
+        </Link>
       </section>
 
       <div className="flex flex-wrap gap-3">

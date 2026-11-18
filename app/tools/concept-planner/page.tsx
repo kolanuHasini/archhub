@@ -30,6 +30,7 @@ export default function ConceptPlannerPage() {
           projectTypes={concepts.projectTypes}
           climates={concepts.climates}
           drivers={concepts.drivers}
+          siteOptions={concepts.siteStudy}
         />
       </div>
     </div>

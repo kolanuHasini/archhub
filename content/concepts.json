@@ -11,6 +11,44 @@
     "Interior",
     "Other"
   ],
+  "siteStudy": {
+    "directions": [
+      "North",
+      "North-east",
+      "East",
+      "South-east",
+      "South",
+      "South-west",
+      "West",
+      "North-west"
+    ],
+    "slopes": [
+      "Flat",
+      "Gentle slope",
+      "Steep slope",
+      "Uneven or terraced"
+    ],
+    "vegetation": [
+      "None (bare site)",
+      "Grass or shrubs only",
+      "A few trees",
+      "Many trees",
+      "Dense vegetation"
+    ],
+    "checklist": [
+      "Measured the site boundary and marked the dimensions",
+      "Marked north and the direction the site faces",
+      "Took photos from every side and from the road",
+      "Marked existing trees, plants and water on a plan",
+      "Noted the neighbouring buildings and their heights",
+      "Noted the road, footpath and entry points",
+      "Recorded levels or the direction of slope",
+      "Noted the sun path and where shadows fall",
+      "Noted the wind direction and sources of noise",
+      "Checked local rules: setbacks, height limit, ground coverage",
+      "Located services: water, drainage, electricity"
+    ]
+  },
   "climates": [
     {
       "id": "hot-dry",

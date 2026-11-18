@@ -32,6 +32,11 @@ function write(key: string, value: string | null) {
   listeners.forEach((listener) => listener());
 }
 
+/** False when the browser's storage was full or blocked for this item. */
+export function isSavedInBrowser(key: string): boolean {
+  return !memory.has(key);
+}
+
 function subscribe(listener: () => void) {
   listeners.add(listener);
   window.addEventListener("storage", listener);
