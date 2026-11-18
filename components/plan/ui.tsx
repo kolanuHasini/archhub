@@ -33,7 +33,7 @@ export function Row({
 }
 
 const field =
-  "h-7 rounded border border-[#3a3e45] bg-[#15161a] px-2 text-[#e6e8ec] outline-none focus:border-[#4c8dff]";
+  "h-7 rounded border border-[#3a3e45] bg-[#15161a] px-2 text-[#e6e8ec] outline-none focus:border-[#d17e5b]";
 
 /** A number box that saves when you press Enter or click away. */
 export function NumInput({
@@ -136,7 +136,7 @@ export function Toggle({
         type="checkbox"
         checked={checked}
         onChange={(event) => onChange(event.target.checked)}
-        className="h-3.5 w-3.5 accent-[#4c8dff]"
+        className="h-3.5 w-3.5 accent-[#d17e5b]"
       />
       {label}
     </label>
@@ -167,7 +167,7 @@ export function Btn({
       aria-pressed={active}
       className={`h-7 shrink-0 rounded border px-2.5 text-[12px] disabled:cursor-not-allowed disabled:opacity-40 ${
         active
-          ? "border-[#4c8dff] bg-[#4c8dff] text-white"
+          ? "border-[#d17e5b] bg-[#d17e5b] text-white"
           : danger
             ? "border-[#5a3338] bg-[#2a1c1e] text-[#ff9aa5] hover:border-[#ff7a88]"
             : "border-[#3a3e45] bg-[#26282d] text-[#d7d9de] hover:border-[#6b7280]"

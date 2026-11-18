@@ -83,7 +83,7 @@ import { isSavedInBrowser, useSavedState } from "@/lib/useSavedState";
 
 const STORAGE_KEY = "archhub.plan.v1";
 const PLANNER_KEY = "archhub.concept-planner.v1";
-const ACCENT = "#4c8dff";
+const ACCENT = "#d17e5b";
 const HISTORY_LIMIT = 60;
 
 type ToolId =
@@ -1730,7 +1730,7 @@ export default function PlanStudio() {
       {/* Top bar */}
       <header className={`${bar} h-11 shrink-0 overflow-x-auto border-b px-2`}>
         <Link href="/dashboard" className="mr-1 shrink-0 font-mono text-[13px] font-semibold text-white">
-          ← Arch<span className="text-[#4c8dff]">Hub</span>
+          ← Arch<span className="text-[#d17e5b]">Hub</span>
         </Link>
         <span className="mr-2 shrink-0 border-l border-[#3a3e45] pl-3 text-[13px] text-[#b4b8c0]">
           {project.name} · Floor Plan Studio
@@ -1740,7 +1740,7 @@ export default function PlanStudio() {
           onChange={(event) => switchFloor(event.target.value)}
           aria-label="Floor"
           title="Switch floor"
-          className="mr-1 h-7 shrink-0 rounded border border-[#4c8dff] bg-[#15161a] px-2 text-[12px] text-white outline-none"
+          className="mr-1 h-7 shrink-0 rounded border border-[#d17e5b] bg-[#15161a] px-2 text-[12px] text-white outline-none"
         >
           {floors.map((floor) => (
             <option key={floor.id} value={floor.id}>
@@ -1809,7 +1809,7 @@ export default function PlanStudio() {
                   aria-pressed={tool === item.id}
                   onClick={() => setTool(item.id)}
                   className={`mb-0.5 flex h-7 w-full items-center justify-between rounded px-2 text-left ${
-                    tool === item.id ? "bg-[#4c8dff] text-white" : "text-[#d7d9de] hover:bg-[#2c2f35]"
+                    tool === item.id ? "bg-[#d17e5b] text-white" : "text-[#d7d9de] hover:bg-[#2c2f35]"
                   }`}
                 >
                   <span>{item.label}</span>
@@ -2099,7 +2099,7 @@ export default function PlanStudio() {
                     aria-pressed={floor.id === currentFloor.id}
                     onClick={() => switchFloor(floor.id)}
                     className={`flex h-7 w-full items-center justify-between rounded px-2 text-left ${
-                      floor.id === currentFloor.id ? "bg-[#4c8dff] text-white" : "hover:bg-[#2c2f35]"
+                      floor.id === currentFloor.id ? "bg-[#d17e5b] text-white" : "hover:bg-[#2c2f35]"
                     }`}
                   >
                     <span>{floor.name}</span>
@@ -2508,10 +2508,10 @@ export default function PlanStudio() {
 
       {/* Command line and status */}
       <footer className={`${bar} h-8 shrink-0 overflow-x-auto border-t px-2`}>
-        <span className="shrink-0 font-mono text-[#4c8dff]">&gt;</span>
+        <span className="shrink-0 font-mono text-[#d17e5b]">&gt;</span>
         <span className="min-w-0 flex-1 truncate font-mono text-[#d7d9de]">
           {notice || prompt}
-          {buffer && <span className="ml-2 rounded bg-[#4c8dff] px-1.5 text-white">{buffer}</span>}
+          {buffer && <span className="ml-2 rounded bg-[#d17e5b] px-1.5 text-white">{buffer}</span>}
         </span>
         <span className="shrink-0 font-mono text-[#8b9099]">
           {cursor ? `${formatLength(cursor.p[0], settings.unit)}, ${formatLength(-cursor.p[1], settings.unit)}` : ""}
