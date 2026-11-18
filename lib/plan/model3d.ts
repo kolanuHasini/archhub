@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { getFurniture } from "./furniture";
 import { dist, unit, wallPointAt, wallShape } from "./geometry";
 import { FINISH_COLOURS } from "./styles";
+import { material, measureBox } from "./textures3d";
 import {
   DEFAULT_ROOF,
   DEFAULT_STRUCTURE,
@@ -86,15 +87,23 @@ export function buildModel(
   const tone = (colour: string) => (options.clay ? "#f4f2ec" : colour);
   const solid = (colour: string, extra: THREE.MeshStandardMaterialParameters = {}) =>
     new THREE.MeshStandardMaterial({ color: tone(colour), roughness: 0.9, ...extra });
-  const wallMaterial = solid(FACADE_COLOURS[facade] ?? FACADE_COLOURS.plaster);
-  const slabMaterial = solid("#cfcdc8");
-  const glassMaterial = new THREE.MeshStandardMaterial({
-    color: options.clay ? "#dfe6e8" : "#9fc3cf",
+  // In the white card model everything is one matt colour; otherwise each
+  // surface gets its real material, with texture and relief.
+  const real = (name: string) => (options.clay ? solid("#f4f2ec") : material(name));
+  const wallMaterial = real(facade);
+  const slabMaterial = real("concrete");
+  const glassMaterial = new THREE.MeshPhysicalMaterial({
+    color: options.clay ? "#dfe6e8" : "#a9c7d1",
     transparent: true,
-    opacity: 0.38,
-    roughness: 0.1,
+    opacity: options.clay ? 0.35 : 0.3,
+    roughness: 0.04,
+    metalness: 0,
+    clearcoat: 1,
+    envMapIntensity: 1.8,
   });
-  const doorMaterial = solid("#9c6f43");
+  const doorMaterial = real("door");
+  const frameMaterial = solid("#2e3235", { roughness: 0.45, metalness: 0.5 });
+  const sillMaterial = solid("#d9d5cb", { roughness: 0.8 });
   const edgeMaterial = new THREE.LineBasicMaterial({ color: "#2a2a2a" });
 
   // A box standing on the plan: centred at `at`, `length` along the angle.
@@ -105,11 +114,12 @@ export function buildModel(
     thickness: number,
     base: number,
     height: number,
-    material: THREE.Material,
+    material: THREE.Material, // (named so here; the textures come from textures3d)
     outlined = false,
   ) {
     if (length <= 0 || height <= 0) return;
     const geometry = new THREE.BoxGeometry(length * M, height * M, thickness * M);
+    measureBox(geometry, length * M, height * M, thickness * M);
     const mesh = new THREE.Mesh(geometry, material);
     mesh.position.set(at[0] * M, (base + height / 2) * M, at[1] * M);
     mesh.rotation.y = -angle;
@@ -178,10 +188,28 @@ export function buildModel(
         const head = Math.min(sill + gap.o.height, wall.h);
         box(middle, angle, width, wall.t, level, sill, wallMaterial, true); // below
         box(middle, angle, width, wall.t, level + head, wall.h - head, wallMaterial, true); // above
-        if (gap.o.kind === "window" || gap.o.style === "sliding") {
-          box(middle, angle, width, 30, level + sill, head - sill, glassMaterial);
+        const glazed = gap.o.kind === "window" || gap.o.style === "sliding";
+        if (glazed) {
+          box(middle, angle, width, 24, level + sill, head - sill, glassMaterial);
         } else if (gap.o.style !== "opening") {
-          box(middle, angle, width, 45, level + sill, head - sill, doorMaterial);
+          box(middle, angle, width - 90, 45, level + sill, head - sill - 45, doorMaterial);
+        }
+        if (gap.o.style !== "opening" && !options.clay) {
+          // A frame around the opening, and a bar down the middle of wide windows.
+          const bar = 55;
+          const deep = 90;
+          box(middle, angle, width, deep, level + head - bar, bar, frameMaterial);
+          box(at(gap.start + bar / 2), angle, bar, deep, level + sill, head - sill, frameMaterial);
+          box(at(gap.end - bar / 2), angle, bar, deep, level + sill, head - sill, frameMaterial);
+          if (glazed) {
+            box(middle, angle, width, deep, level + sill, bar, frameMaterial);
+            const panes = Math.max(1, Math.round(width / 900));
+            for (let k = 1; k < panes; k++) {
+              box(at(gap.start + (width * k) / panes), angle, bar * 0.7, deep, level + sill, head - sill, frameMaterial);
+            }
+            // A sill that sticks out a little under the window.
+            if (sill > 0) box(middle, angle, width + 120, wall.t + 110, level + sill - 45, 45, sillMaterial);
+          }
         }
         cursor = gap.end;
       }
@@ -231,7 +259,26 @@ export function buildModel(
     if (room.kind !== "room" || !shown(room) || room.pts.length < 3) continue;
     const colour = FINISH_COLOURS[room.finish]?.fill ?? "#ece8de";
     const outline = new THREE.Shape(room.pts.map((p) => new THREE.Vector2(p[0] * M, p[1] * M)));
-    const mesh = new THREE.Mesh(new THREE.ShapeGeometry(outline), solid(colour, { side: THREE.DoubleSide }));
+    // Finishes with a strong pattern get their real texture; the rest a matt colour.
+    const textured: Record<string, string> = {
+      wood: "woodFloor",
+      herringbone: "woodFloor",
+      deck: "timber",
+      tile600: "tile",
+      tile300: "tile",
+      checker: "tile",
+      stone: "paving",
+      pavers: "brick",
+      brick: "brick",
+      concrete: "concrete",
+      grass: "grass",
+    };
+    const floorMaterial =
+      !options.clay && textured[room.finish]
+        ? material(textured[room.finish])
+        : solid(colour, { roughness: 0.7 });
+    const mesh = new THREE.Mesh(new THREE.ShapeGeometry(outline), floorMaterial);
+    floorMaterial.side = THREE.DoubleSide;
     mesh.rotation.x = Math.PI / 2; // lay the shape flat (its y becomes Z)
     mesh.position.y = (levelFor(room) + 8) * M;
     mesh.receiveShadow = true;
@@ -276,12 +323,18 @@ export function buildModel(
       const span = alongX ? y2 - y1 : x2 - x1; // across the ridge
       const slope = Math.tan((Math.min(Math.max(roof.pitch, 1), 70) * Math.PI) / 180);
       // A point given as (distance along ridge, distance across, height).
-      const point = (l: number, s: number, h: number) =>
-        alongX
+      // Each point also remembers where it is on the roof surface, in metres,
+      // so the tile texture runs up the slope at its true size.
+      type RoofPoint = THREE.Vector3 & { tile?: [number, number] };
+      const point = (l: number, s: number, h: number): RoofPoint => {
+        const spot: RoofPoint = alongX
           ? new THREE.Vector3((x1 + l) * M, (base + h) * M, (y1 + s) * M)
           : new THREE.Vector3((x1 + s) * M, (base + h) * M, (y1 + l) * M);
-      const triangles: THREE.Vector3[] = [];
-      const quad = (a: THREE.Vector3, b: THREE.Vector3, c: THREE.Vector3, d: THREE.Vector3) =>
+        spot.tile = [l * M, Math.hypot(Math.min(s, span - s), h) * M];
+        return spot;
+      };
+      const triangles: RoofPoint[] = [];
+      const quad = (a: RoofPoint, b: RoofPoint, c: RoofPoint, d: RoofPoint) =>
         triangles.push(a, b, c, a, c, d);
       const A = point(0, 0, 0);
       const B = point(length, 0, 0);
@@ -305,11 +358,14 @@ export function buildModel(
         triangles.push(A, D, R1, B, C, R2); // gable ends, or the hips
       }
       const geometry = new THREE.BufferGeometry().setFromPoints(triangles);
-      geometry.computeVertexNormals();
-      const mesh = new THREE.Mesh(
-        geometry,
-        solid("#a9634a", { side: THREE.DoubleSide, flatShading: true }),
+      geometry.setAttribute(
+        "uv",
+        new THREE.Float32BufferAttribute(triangles.flatMap((p) => p.tile ?? [0, 0]), 2),
       );
+      geometry.computeVertexNormals();
+      const roofMaterial = real("roofTile");
+      roofMaterial.side = THREE.DoubleSide;
+      const mesh = new THREE.Mesh(geometry, roofMaterial);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       group.add(mesh);
@@ -332,32 +388,75 @@ export function buildModel(
   }
 
   if (options.trees) {
-    const trunk = solid("#7a5a3c");
-    const leaves = [solid("#7fa172"), solid("#93b085"), solid("#6a8f5f")];
-    let index = 0;
+    const trunk = solid("#6b4f38", { roughness: 1 });
+    const leaves = ["#3f5f38", "#557a48", "#35512f", "#688a55"].map((colour) =>
+      solid(colour, { roughness: 1 }),
+    );
     for (const tree of entities) {
       if (tree.kind !== "tree") continue;
+      // Each tree gets its own shape, the same every time it is drawn.
+      let seed = 7;
+      for (const letter of tree.id) seed = (seed * 31 + letter.charCodeAt(0)) % 100000;
+      const next = () => {
+        seed = (seed * 9301 + 49297) % 233280;
+        return seed / 233280;
+      };
       const r = tree.r * M;
-      const stem = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.07, r * 0.1, r * 1.6, 8), trunk);
-      stem.position.set(tree.p[0] * M, r * 0.8 - structure.plinth * M, tree.p[1] * M);
+      const groundY = -structure.plinth * M;
+      const x = tree.p[0] * M;
+      const z = tree.p[1] * M;
+      const stem = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.06, r * 0.11, r * 1.7, 10), trunk);
+      stem.position.set(x, groundY + r * 0.85, z);
       stem.castShadow = true;
-      const crown = new THREE.Mesh(new THREE.IcosahedronGeometry(r, 1), leaves[index++ % leaves.length]);
-      crown.position.set(tree.p[0] * M, r * 2.1 - structure.plinth * M, tree.p[1] * M);
-      crown.castShadow = true;
-      group.add(stem, crown);
+      group.add(stem);
+      // The crown is a cluster of overlapping, slightly uneven clumps of leaves.
+      const clumps = 9;
+      for (let k = 0; k < clumps; k++) {
+        const size = r * (0.42 + next() * 0.3);
+        const clump = new THREE.Mesh(
+          new THREE.IcosahedronGeometry(size, 2),
+          leaves[Math.floor(next() * leaves.length)],
+        );
+        const turn = next() * Math.PI * 2;
+        const out = k === 0 ? 0 : r * (0.25 + next() * 0.45);
+        clump.position.set(
+          x + Math.cos(turn) * out,
+          groundY + r * (1.75 + next() * 0.75),
+          z + Math.sin(turn) * out,
+        );
+        clump.scale.set(1, 0.82 + next() * 0.25, 1);
+        clump.castShadow = true;
+        clump.receiveShadow = true;
+        group.add(clump);
+      }
     }
   }
 
   // --- Ground and plinth ----------------------------------------------------------------
   const site = plan.site as { w?: number; d?: number } | null | undefined;
-  const pad = 9000;
+  const pad = 30000; // grass well beyond the building, out towards the horizon
   const gx1 = Math.min(bounds.x1 - pad, 0);
   const gx2 = Math.max(bounds.x2 + pad, site?.w ?? 0);
   const gy1 = Math.min(bounds.y1 - pad, 0);
   const gy2 = Math.max(bounds.y2 + pad, site?.d ?? 0);
+  // The building stands on a solid plinth, with a paved strip around it.
+  for (const floor of floors) {
+    if (floor.level !== Math.min(...floors.map((f) => f.level))) continue;
+    const area = footprint(floor.id);
+    if (!area) continue;
+    const middle: Pt = [(area.x1 + area.x2) / 2, (area.y1 + area.y2) / 2];
+    box(middle, 0, area.x2 - area.x1, area.y2 - area.y1, floor.level - structure.plinth, structure.plinth - structure.slab, real("concrete"));
+    box(middle, 0, area.x2 - area.x1 + 2400, area.y2 - area.y1 + 2400, floor.level - structure.plinth, 50, real("paving"));
+  }
+
+  const groundGeometry = new THREE.PlaneGeometry((gx2 - gx1) * M, (gy2 - gy1) * M);
+  const groundUv = groundGeometry.attributes.uv;
+  for (let i = 0; i < groundUv.count; i++) {
+    groundUv.setXY(i, groundUv.getX(i) * (gx2 - gx1) * M, groundUv.getY(i) * (gy2 - gy1) * M);
+  }
   const ground = new THREE.Mesh(
-    new THREE.PlaneGeometry((gx2 - gx1) * M, (gy2 - gy1) * M),
-    solid("#c9d3b4"),
+    groundGeometry,
+    options.clay ? solid("#e9e6dd") : material("grass"),
   );
   ground.rotation.x = -Math.PI / 2;
   ground.position.set(((gx1 + gx2) / 2) * M, -structure.plinth * M, ((gy1 + gy2) / 2) * M);

@@ -4,6 +4,11 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { Sky } from "three/examples/jsm/objects/Sky.js";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { GTAOPass } from "three/examples/jsm/postprocessing/GTAOPass.js";
+import { OutputPass } from "three/examples/jsm/postprocessing/OutputPass.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { downloadBlob, safeFileName } from "@/lib/download";
 import { buildModel, disposeModel, type ModelInfo } from "@/lib/plan/model3d";
 import { GROUND_FLOOR, type Floor, type Settings } from "@/lib/plan/types";
@@ -30,6 +35,10 @@ type Stage = {
   camera: THREE.PerspectiveCamera;
   controls: OrbitControls;
   sun: THREE.DirectionalLight;
+  sky: Sky;
+  pmrem: THREE.PMREMGenerator;
+  composer: EffectComposer | null; // adds the soft shading in corners
+  soft: boolean;
   model: ModelInfo | null;
   walking: boolean;
   framed: boolean; // true once the camera has been pointed at the building
@@ -51,7 +60,8 @@ export default function View3D() {
 
   const [walking, setWalking] = useState(false);
   const [clay, setClay] = useState(false);
-  const [edges, setEdges] = useState(true);
+  const [edges, setEdges] = useState(false);
+  const [soft, setSoft] = useState(true); // soft shading where surfaces meet
   const [showRoof, setShowRoof] = useState(true);
   const [showFurniture, setShowFurniture] = useState(true);
   const [showTrees, setShowTrees] = useState(true);
@@ -80,25 +90,54 @@ export default function View3D() {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // Film-like handling of bright and dark, as in a photograph.
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 0.72;
     holder.appendChild(renderer.domElement);
     renderer.domElement.style.display = "block";
     renderer.domElement.style.touchAction = "none";
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color("#eef1f3");
-    scene.add(new THREE.HemisphereLight("#ffffff", "#b9b3a6", 1.15));
-    const sun = new THREE.DirectionalLight("#fff4e0", 2.2);
+    // A physical sky: its colour changes with the height of the sun.
+    const sky = new Sky();
+    sky.scale.setScalar(4000);
+    sky.material.uniforms.turbidity.value = 4;
+    sky.material.uniforms.rayleigh.value = 1.3;
+    sky.material.uniforms.mieCoefficient.value = 0.004;
+    sky.material.uniforms.mieDirectionalG.value = 0.82;
+    scene.add(sky);
+    scene.add(new THREE.HemisphereLight("#dfeaf5", "#8f8676", 0.35));
+    const sun = new THREE.DirectionalLight("#fff1dc", 3.4);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.mapSize.set(4096, 4096);
+    sun.shadow.bias = -0.0003;
+    sun.shadow.normalBias = 0.03;
+    sun.shadow.radius = 4;
     scene.add(sun, sun.target);
+    const pmrem = new THREE.PMREMGenerator(renderer);
 
-    const camera = new THREE.PerspectiveCamera(50, 1, 0.05, 2000);
+    const camera = new THREE.PerspectiveCamera(40, 1, 0.05, 6000);
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.maxPolarAngle = Math.PI / 2 - 0.02; // do not go under the ground
 
+    // Soft shading in corners and under overhangs (ambient occlusion). If the
+    // device cannot do it, the plain picture is used instead.
+    let composer: EffectComposer | null = null;
+    try {
+      const target = new THREE.WebGLRenderTarget(4, 4, { samples: 4, type: THREE.HalfFloatType });
+      composer = new EffectComposer(renderer, target);
+      composer.addPass(new RenderPass(scene, camera));
+      const shading = new GTAOPass(scene, camera, 4, 4);
+      shading.blendIntensity = 1.1;
+      composer.addPass(shading);
+      composer.addPass(new OutputPass());
+    } catch {
+      composer = null;
+    }
+
     const stage: Stage = {
-      renderer, scene, camera, controls, sun,
+      renderer, scene, camera, controls, sun, sky, pmrem, composer, soft: true,
       model: null, walking: false, framed: false, yaw: 0, pitch: 0, keys: new Set(),
     };
     stageRef.current = stage;
@@ -107,6 +146,7 @@ export default function View3D() {
       const width = holder.clientWidth || 800;
       const height = holder.clientHeight || 500;
       renderer.setSize(width, height);
+      composer?.setSize(width, height);
       camera.aspect = width / height;
       camera.updateProjectionMatrix();
     };
@@ -157,7 +197,8 @@ export default function View3D() {
       } else {
         controls.update();
       }
-      renderer.render(scene, camera);
+      if (stage.composer && stage.soft) stage.composer.render();
+      else renderer.render(scene, camera);
       frame = requestAnimationFrame(tick);
     };
     frame = requestAnimationFrame(tick);
@@ -172,6 +213,8 @@ export default function View3D() {
       window.removeEventListener("keyup", onKey);
       controls.dispose();
       if (stage.model) disposeModel(stage.model.group);
+      pmrem.dispose();
+      composer?.dispose();
       renderer.dispose();
       canvas.remove();
       stageRef.current = null;
@@ -195,9 +238,10 @@ export default function View3D() {
     stage.model = model;
     stage.scene.add(model.group);
     if (firstTime) {
-      // Start with a three-quarter view from the front.
-      const reach = model.size * 1.15;
-      stage.camera.position.set(model.centre.x + reach * 0.8, model.centre.y + reach * 0.75, model.centre.z + reach);
+      // Start with a three-quarter view from the front, not far above eye level.
+      const reach = model.size * 1.25;
+      stage.camera.position.set(model.centre.x + reach * 0.85, model.centre.y + reach * 0.3, model.centre.z + reach);
+      stage.scene.fog = new THREE.Fog("#dfe8ef", model.size * 5, model.size * 40);
       stage.controls.target.copy(model.centre);
       stage.controls.update();
     }
@@ -218,6 +262,28 @@ export default function View3D() {
     );
     stage.sun.target.position.copy(centre);
     stage.sun.castShadow = shadows;
+    // Low sun is warmer and weaker, like early morning or evening.
+    stage.sun.color.set(sunHeight < 25 ? "#ffd2a1" : "#fff1dc");
+    stage.sun.intensity = 1.6 + Math.sin(up) * 2.2;
+
+    // Put the sun in the sky, and let the sky light the scene and show in the glass.
+    const towards = stage.sun.position.clone().sub(centre).normalize();
+    stage.sky.material.uniforms.sunPosition.value.copy(towards);
+    const mirror = new THREE.Scene();
+    const mirrorSky = new Sky();
+    mirrorSky.scale.setScalar(4000);
+    mirrorSky.material.uniforms.turbidity.value = 4;
+    mirrorSky.material.uniforms.rayleigh.value = 1.3;
+    mirrorSky.material.uniforms.mieCoefficient.value = 0.004;
+    mirrorSky.material.uniforms.mieDirectionalG.value = 0.82;
+    mirrorSky.material.uniforms.sunPosition.value.copy(towards);
+    mirror.add(mirrorSky);
+    const old = stage.scene.environment;
+    stage.scene.environment = stage.pmrem.fromScene(mirror).texture;
+    stage.scene.environmentIntensity = 0.55;
+    old?.dispose();
+    mirrorSky.material.dispose();
+    mirrorSky.geometry.dispose();
     const shadow = stage.sun.shadow.camera;
     shadow.left = shadow.bottom = -size * 1.6;
     shadow.right = shadow.top = size * 1.6;
@@ -225,6 +291,10 @@ export default function View3D() {
     shadow.far = reach * 3;
     shadow.updateProjectionMatrix();
   }, [saved, sunTurn, sunHeight, shadows, north, shownTop]);
+
+  useEffect(() => {
+    if (stageRef.current) stageRef.current.soft = soft;
+  }, [soft]);
 
   // Switch between orbiting outside and walking inside.
   function setMode(walk: boolean) {
@@ -239,11 +309,11 @@ export default function View3D() {
       stage.pitch = 0;
       stage.camera.fov = 70;
     } else {
-      const reach = stage.model.size * 1.15;
+      const reach = stage.model.size * 1.25;
       const centre = stage.model.centre;
-      stage.camera.position.set(centre.x + reach * 0.8, centre.y + reach * 0.75, centre.z + reach);
+      stage.camera.position.set(centre.x + reach * 0.85, centre.y + reach * 0.3, centre.z + reach);
       stage.controls.target.copy(centre);
-      stage.camera.fov = 50;
+      stage.camera.fov = 40;
     }
     stage.camera.updateProjectionMatrix();
     setWalking(walk);
@@ -272,7 +342,8 @@ export default function View3D() {
   function savePicture() {
     const stage = stageRef.current;
     if (!stage) return;
-    stage.renderer.render(stage.scene, stage.camera);
+    if (stage.composer && stage.soft) stage.composer.render();
+    else stage.renderer.render(stage.scene, stage.camera);
     stage.renderer.domElement.toBlob((blob) => {
       if (blob) downloadBlob(blob, `3d-view-${safeFileName(active.name)}.png`);
     }, "image/png");
@@ -285,6 +356,7 @@ export default function View3D() {
   const small =
     "rounded-md border border-line px-2.5 py-1.5 text-[14px] transition-colors hover:border-ink";
   const toggles = [
+    { label: "Soft shading in corners", on: soft, set: setSoft },
     { label: "White card model", on: clay, set: setClay },
     { label: "Outlines", on: edges, set: setEdges },
     { label: "Shadows", on: shadows, set: setShadows },
