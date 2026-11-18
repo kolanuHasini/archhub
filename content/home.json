@@ -68,8 +68,9 @@
     },
     {
       "title": "Portfolio",
-      "status": "soon",
-      "description": "Lay out sheets and export a PDF."
+      "href": "/portfolio",
+      "status": "live",
+      "description": "Lay out sheets from your drawings and export a PDF."
     }
   ],
   "sections": [

@@ -113,7 +113,7 @@ export default function Dashboard() {
       note: plan.walls.length > 0 ? "Built from your plans" : "Needs a plan first",
       href: "/view3d",
     },
-    { title: "Portfolio", state: "planned", note: "In progress", href: "" },
+    { title: "Portfolio", state: "todo", note: "Lay out a sheet", href: "/portfolio" },
   ];
 
   const items = Array.isArray(tasks.items) ? tasks.items : [];

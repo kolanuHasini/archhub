@@ -29,6 +29,7 @@ const NAV: { title: string; items: NavItem[] }[] = [
       { href: "/elevations", label: "Elevations", icon: "elevation" },
       { href: "/sections", label: "Sections", icon: "section" },
       { href: "/view3d", label: "3D view", icon: "cube" },
+      { href: "/portfolio", label: "Portfolio", icon: "sheet" },
       { href: "/ai", label: "AI Studio", icon: "spark" },
     ],
   },
@@ -42,7 +43,7 @@ const NAV: { title: string; items: NavItem[] }[] = [
 ];
 
 // Planned areas, listed so the direction is clear, but not yet built.
-const PLANNED = ["Portfolio", "Templates"];
+const PLANNED = ["Templates"];
 
 // Simple line icons, drawn on a 20 x 20 grid.
 const ICONS: Record<string, string> = {
@@ -53,6 +54,7 @@ const ICONS: Record<string, string> = {
   elevation: "M2.5 17h15M4.5 17V7l5.5-4 5.5 4v10M8.5 17v-4h3v4M7 9.5h2M11 9.5h2",
   section: "M2.5 16.5h15M4 16.5v-9h12v9M4 11.5h12M8 7.5v-4M2.5 3.5h11",
   cube: "M10 2.5l6.5 3.7v7.6L10 17.5l-6.5-3.7V6.2ZM3.5 6.2 10 10l6.5-3.8M10 10v7.5",
+  sheet: "M3 4h14v12H3ZM3 13h14M6 6.5h5v4H6ZM13 6.5h1.5M13 9h1.5",
   spark: "M10 2.5l1.8 5.7 5.7 1.8-5.7 1.8L10 17.5l-1.8-5.7L2.5 10l5.7-1.8Z",
   grid: "M3 3h6v6H3ZM11 3h6v6h-6ZM3 11h6v6H3ZM11 11h6v6h-6Z",
   ruler: "M2.5 13.5 13.5 2.5l4 4-11 11ZM6 10l1.5 1.5M8.5 7.5 10 9M11 5l1.5 1.5",

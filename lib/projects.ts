@@ -40,6 +40,7 @@ export const WORK_KEYS = {
   sketch: "archhub.concept-sketch.v1",
   plan: "archhub.plan.v1",
   tasks: "archhub.tasks.v1",
+  portfolio: "archhub.portfolio.v1",
 };
 
 export function useProjects() {
