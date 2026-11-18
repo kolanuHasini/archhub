@@ -22,7 +22,7 @@ export default function ConceptPlannerPage() {
         Concept Planner
       </h1>
       <p className="mt-3 max-w-2xl leading-relaxed text-muted">
-        No concept yet? Work through five short steps and leave with a clear
+        No concept yet? Work through six short steps and leave with a clear
         idea, a concept sketch, and a concept statement you can present.
       </p>
       <div className="mt-8">
@@ -31,6 +31,7 @@ export default function ConceptPlannerPage() {
           climates={concepts.climates}
           drivers={concepts.drivers}
           siteOptions={concepts.siteStudy}
+          inspirationOptions={concepts.inspiration}
         />
       </div>
     </div>

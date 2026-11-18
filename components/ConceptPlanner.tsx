@@ -2,6 +2,11 @@
 
 import Link from "next/link";
 import { useRef } from "react";
+import Inspiration, {
+  EMPTY_INSPIRATION,
+  type InspirationOptions,
+  type InspirationValues,
+} from "@/components/Inspiration";
 import SiteStudy, {
   EMPTY_SITE,
   siteArea,
@@ -22,7 +27,7 @@ type Driver = {
   diagrams: string[];
 };
 
-type Plan = SiteValues & {
+type Plan = SiteValues & InspirationValues & {
   name: string;
   type: string;
   users: string;
@@ -36,6 +41,7 @@ type Plan = SiteValues & {
 
 const EMPTY_PLAN: Plan = {
   ...EMPTY_SITE,
+  ...EMPTY_INSPIRATION,
   name: "",
   type: "",
   users: "",
@@ -85,6 +91,12 @@ function draftStatement(
 
   if (plan.bigIdea.trim()) {
     sentences.push(endSentence(`The big idea: ${plan.bigIdea.trim()}`));
+  }
+
+  if (plan.inspName.trim()) {
+    let form = `Its form is inspired by ${plan.inspName.trim()}`;
+    if (plan.inspTranslate.trim()) form += `: ${plan.inspTranslate.trim()}`;
+    sentences.push(endSentence(form));
   }
 
   if (climate) {
@@ -166,10 +178,17 @@ function buildSummary(
   lines.push(`Big idea: ${plan.bigIdea || "-"}`);
   lines.push(
     "",
-    "4. CONCEPT SKETCH",
+    "4. INSPIRATION AND FORM",
+    `Inspired by: ${plan.inspName || "-"}${plan.inspSource ? ` (${plan.inspSource})` : ""}`,
+    `Observe: ${plan.inspObserve || "-"}`,
+    `Simplify: ${plan.inspSimplify || "-"}`,
+    `Translate: ${plan.inspTranslate || "-"}`,
+    `Make it a building: ${plan.inspRefine || "-"}`,
+    "",
+    "5. CONCEPT SKETCH",
     "Download the sketch as an image from the Concept Planner page.",
     "",
-    "5. CONCEPT STATEMENT",
+    "6. CONCEPT STATEMENT",
     plan.statement || "-",
     "",
   );
@@ -185,6 +204,7 @@ const STEP_TITLES = [
   "Brief",
   "Site study",
   "Design drivers",
+  "Inspiration and form",
   "Concept sketch",
   "Concept statement",
 ];
@@ -275,7 +295,9 @@ export default function ConceptPlanner({
   climates,
   drivers,
   siteOptions,
+  inspirationOptions,
 }: {
+  inspirationOptions: InspirationOptions;
   projectTypes: string[];
   climates: Climate[];
   drivers: Driver[];
@@ -302,10 +324,38 @@ export default function ConceptPlanner({
     plan.name.trim() !== "" && plan.type !== "",
     plan.location.trim() !== "" && plan.climate !== "" && plan.facing !== "",
     chosenDrivers.length > 0,
+    plan.inspName.trim() !== "" && plan.inspTranslate.trim() !== "",
     hasSketch,
     plan.statement.trim() !== "",
   ];
   const doneCount = stepsDone.filter(Boolean).length;
+
+  // Copies the inspiration picture onto the sketch sheet, ready to trace over.
+  function placeInspirationOnSketch() {
+    if (!plan.inspImage) return;
+    const aspect = Number(plan.inspAspect) || 1.5;
+    const sheetWidth = 1200;
+    const sheetHeight = 750;
+    const width = Math.min(sheetWidth * 0.6, sheetHeight * 0.6 * aspect);
+    const height = width / aspect;
+    const x = (sheetWidth - width) / 2;
+    const y = (sheetHeight - height) / 2;
+    const shapes = Array.isArray(sketch.shapes) ? sketch.shapes : [];
+    saveSketch({
+      shapes: [
+        ...shapes,
+        {
+          id: Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
+          tool: "image",
+          color: "",
+          size: 0,
+          points: [x, y, x + width, y + height].map((value) => Math.round(value)),
+          href: plan.inspImage,
+        },
+      ],
+    });
+    document.getElementById("step-5")?.scrollIntoView({ behavior: "smooth" });
+  }
 
   function toggleDriver(id: string) {
     if (plan.drivers.includes(id)) {
@@ -423,6 +473,12 @@ export default function ConceptPlanner({
             bigger or smaller, and <strong>Eraser</strong> to remove one.
             Prefer paper? Draw by hand, take a photo, and press{" "}
             <strong>Add photo of a paper sketch</strong>.
+          </li>
+          <li>
+            In <strong>Inspiration and form</strong>, add a picture of what
+            inspires you, answer the four questions, then press{" "}
+            <strong>Put it on the sketch sheet to trace</strong> and draw your
+            building form over it.
           </li>
           <li>
             In <strong>Concept statement</strong>, press the blue button for a
@@ -658,8 +714,21 @@ export default function ConceptPlanner({
 
       <Step
         index={3}
-        hint="Draw your idea: a bubble diagram, a parti, a quick section. Rough is fine."
+        hint="Optional, but powerful: start from an object, an animal or an idea, and work it into a building form step by step."
         done={stepsDone[3]}
+      >
+        <Inspiration
+          values={plan}
+          options={inspirationOptions}
+          onChange={update}
+          onPlaceOnSketch={placeInspirationOnSketch}
+        />
+      </Step>
+
+      <Step
+        index={4}
+        hint="Draw your idea: a bubble diagram, a parti, a quick section. Rough is fine."
+        done={stepsDone[4]}
       >
         <SketchPad
           storageKey={SKETCH_KEY}
@@ -668,9 +737,9 @@ export default function ConceptPlanner({
       </Step>
 
       <Step
-        index={4}
+        index={5}
         hint="Get a first draft from your answers, then rewrite it in your own words."
-        done={stepsDone[4]}
+        done={stepsDone[5]}
       >
         <button
           type="button"

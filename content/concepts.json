@@ -49,6 +49,51 @@
       "Located services: water, drainage, electricity"
     ]
   },
+  "inspiration": {
+    "sources": [
+      "An object (instrument, tool, toy, vessel)",
+      "An animal or plant",
+      "A natural form (shell, wave, rock, leaf)",
+      "Music, dance or art",
+      "A local craft or tradition",
+      "A feeling or abstract idea"
+    ],
+    "steps": [
+      {
+        "id": "inspObserve",
+        "title": "1. Observe",
+        "question": "Look closely. What are its strongest lines, curves and parts?",
+        "example": "e.g. a violin: one long flowing outline, a narrow waist, four straight strings, a curled scroll"
+      },
+      {
+        "id": "inspSimplify",
+        "title": "2. Simplify",
+        "question": "Strip it down. Which three to five lines would still make it recognisable?",
+        "example": "e.g. the double curve of the body and the straight run of the strings"
+      },
+      {
+        "id": "inspTranslate",
+        "title": "3. Translate",
+        "question": "Turn each line into architecture. What becomes the roof, the structure, the skin, the plan?",
+        "example": "e.g. the body curve becomes a sweeping roof; the strings become a row of slim columns"
+      },
+      {
+        "id": "inspRefine",
+        "title": "4. Make it a building",
+        "question": "How does it meet the ground, where do people enter, and what is the scale next to a person?",
+        "example": "e.g. the low end of the curve touches the plaza as an entrance canopy, 4 m high"
+      }
+    ],
+    "moves": [
+      { "id": "trace", "title": "Trace the outline", "tip": "Use the silhouette as the plan or the elevation." },
+      { "id": "repeat", "title": "Repeat one part", "tip": "Take a single element (a feather, a rib) and array it in a row or a ring." },
+      { "id": "scale", "title": "Change the scale", "tip": "Blow a small detail up until people can walk under it." },
+      { "id": "section", "title": "Cut a section", "tip": "Slice through the object and use the cut shape as the building's profile." },
+      { "id": "structure", "title": "Borrow the structure", "tip": "Copy how it stands up: ribs, shells, tension strings, stacked layers." },
+      { "id": "mirror", "title": "Mirror or rotate", "tip": "Double the shape, or spin it around a centre, to make a symmetrical form." },
+      { "id": "abstract", "title": "Keep only the idea", "tip": "Drop the literal shape and keep the quality: lightness, flow, rhythm, shelter." }
+    ]
+  },
   "climates": [
     {
       "id": "hot-dry",
