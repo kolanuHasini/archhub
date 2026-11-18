@@ -1,4 +1,14 @@
-import { add, mul, perp, sub, unit, wallCorners, wallPointAt, wallShape } from "./geometry";
+import {
+  add,
+  elemRect,
+  mul,
+  perp,
+  sub,
+  unit,
+  wallCorners,
+  wallPointAt,
+  wallShape,
+} from "./geometry";
 import { GROUND_FLOOR, type Entity, type Floor, type Pt, type Wall } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -51,7 +61,39 @@ export type Face = {
   curved?: boolean;
   edgeLeft?: boolean;
   edgeRight?: boolean;
+  elem?: string; // set for columns, beams, stairs, slabs and railings
 };
+
+/**
+ * The solid blocks that make up a structural element: its outline on plan
+ * and how high it reaches. A stair is one block per step.
+ */
+export function elemBlocks(
+  elem: Extract<Entity, { kind: "elem" }>,
+  level: number,
+): { corners: Pt[]; z1: number; z2: number }[] {
+  const { centre, angle, length, width } = elemRect(elem);
+  const d: Pt = [Math.cos(angle), Math.sin(angle)];
+  const n: Pt = [-d[1], d[0]];
+  const corner = (along: number, side: number): Pt => [
+    centre[0] + d[0] * (along - length / 2) + n[0] * side * (width / 2),
+    centre[1] + d[1] * (along - length / 2) + n[1] * side * (width / 2),
+  ];
+  const block = (from: number, to: number) => [
+    corner(from, 1),
+    corner(to, 1),
+    corner(to, -1),
+    corner(from, -1),
+  ];
+  const base = level + elem.base;
+  if (elem.type !== "stair") return [{ corners: block(0, length), z1: base, z2: base + elem.h }];
+  const steps = Math.max(2, Math.round(elem.h / 170));
+  return Array.from({ length: steps }, (_, i) => ({
+    corners: block((length * i) / steps, (length * (i + 1)) / steps),
+    z1: base,
+    z2: base + ((i + 1) * elem.h) / steps,
+  }));
+}
 
 export type TreeFace = { id: string; depth: number; u: number; r: number };
 
@@ -161,6 +203,26 @@ export function buildElevation(
     faces.push(...pieces);
   }
 
+  // Columns, beams, stairs, slabs and railings.
+  for (const elem of entities) {
+    if (elem.kind !== "elem") continue;
+    const level = levelOf.get((elem as { floor?: string }).floor ?? GROUND_FLOOR.id) ?? 0;
+    elemBlocks(elem, level).forEach((piece, index) => {
+      if (beyond !== undefined && Math.max(...piece.corners.map(away)) <= beyond + 1) return;
+      const us = piece.corners.map(across);
+      faces.push({
+        id: `${elem.id}-${index}`,
+        depth: Math.min(...piece.corners.map(away)),
+        u1: Math.min(...us),
+        u2: Math.max(...us),
+        z1: piece.z1,
+        z2: piece.z2,
+        openings: [],
+        elem: elem.type,
+      });
+    });
+  }
+
   faces.sort((first, second) => second.depth - first.depth);
 
   const trees: TreeFace[] = entities
@@ -172,7 +234,7 @@ export function buildElevation(
     })
     .sort((first, second) => second.depth - first.depth);
 
-  const us = faces.flatMap((face) => [face.u1, face.u2]);
+  const us = faces.filter((face) => !face.elem).flatMap((face) => [face.u1, face.u2]);
   const depths = walls.flatMap((wall) => [away(wall.a), away(wall.b)]);
   const widthSpan = us.length > 0 ? Math.max(...us) - Math.min(...us) : 0;
   const depthSpan = depths.length > 0 ? Math.max(...depths) - Math.min(...depths) : 0;
@@ -184,7 +246,8 @@ export function buildElevation(
     floors: [...floors].sort((a, b) => a.level - b.level),
     minU: us.length > 0 ? Math.min(...us) : 0,
     maxU: us.length > 0 ? Math.max(...us) : 0,
-    top: faces.length > 0 ? Math.max(...faces.map((face) => face.z2)) : 0,
+    // The top of the building is the top of its walls (not of a railing or canopy).
+    top: Math.max(0, ...faces.filter((face) => !face.elem).map((face) => face.z2)),
     bottom: faces.length > 0 ? Math.min(0, ...faces.map((face) => face.z1)) : 0,
   };
 }

@@ -1,4 +1,4 @@
-import { buildElevation, lookOf, type Elevation, type ViewId } from "./elevation";
+import { buildElevation, elemBlocks, lookOf, type Elevation, type ViewId } from "./elevation";
 import {
   add,
   mul,
@@ -25,6 +25,7 @@ export type Cut = {
   z1: number;
   z2: number;
   lowest: boolean; // true = stands on the lowest floor, so it needs a footing
+  concrete?: boolean; // a column, beam, slab or stair rather than a wall
 };
 
 export type SectionDrawing = {
@@ -137,6 +138,37 @@ export function buildSection(
         voids.push({ id: `${id}-void`, u1, u2, z1: sill, z2: head });
       }
     }
+  }
+
+  // Columns, beams, slabs and stairs that the cut passes through.
+  for (const elem of entities) {
+    if (elem.kind !== "elem" || elem.type === "railing") continue;
+    const level = levelOf.get((elem as { floor?: string }).floor ?? GROUND_FLOOR.id) ?? 0;
+    elemBlocks(elem, level).forEach((piece, index) => {
+      const crossings: number[] = [];
+      for (let k = 0; k < piece.corners.length; k++) {
+        const p = piece.corners[k];
+        const q = piece.corners[(k + 1) % piece.corners.length];
+        const dp = away(p) - cutDepth;
+        const dq = away(q) - cutDepth;
+        if (dp === dq || dp * dq > 0) continue;
+        crossings.push(across(p) + (across(q) - across(p)) * (dp / (dp - dq)));
+      }
+      if (crossings.length < 2) return;
+      const u1 = Math.min(...crossings);
+      const u2 = Math.max(...crossings);
+      if (u2 - u1 < 1) return;
+      cuts.push({
+        id: `${elem.id}-${index}`,
+        u1,
+        u2,
+        z1: piece.z1,
+        z2: piece.z2,
+        // A column standing on the lowest floor gets a footing, like a wall.
+        lowest: elem.type === "column" && level === lowestLevel && elem.base <= 0,
+        concrete: true,
+      });
+    });
   }
 
   const beyond = buildElevation(plan, view, cutDepth);

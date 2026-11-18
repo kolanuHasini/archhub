@@ -373,15 +373,23 @@ export default function Elevations() {
                 const h = face.z2 - face.z1;
                 return (
                   <g key={face.id}>
-                    <rect
-                      x={face.u1}
-                      y={-face.z2}
-                      width={w}
-                      height={h}
-                      fill={wallFill}
-                      stroke={face.curved ? "none" : style.ink}
-                      strokeWidth="1.3"
-                    />
+                    {face.elem === "railing" ? (
+                      // A railing: a glass panel under a handrail.
+                      <>
+                        <rect x={face.u1} y={-face.z2} width={w} height={h} fill={style.colour ? TONES.glass : "none"} fillOpacity="0.45" stroke={style.ink} strokeWidth="0.8" />
+                        <line x1={face.u1} y1={-face.z2} x2={face.u2} y2={-face.z2} stroke={style.ink} strokeWidth="2.2" />
+                      </>
+                    ) : (
+                      <rect
+                        x={face.u1}
+                        y={-face.z2}
+                        width={w}
+                        height={h}
+                        fill={face.elem ? (style.colour ? "#cfcdc8" : style.paper) : wallFill}
+                        stroke={face.curved ? "none" : style.ink}
+                        strokeWidth="1.3"
+                      />
+                    )}
                     {face.curved && (
                       <path
                         d={

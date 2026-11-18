@@ -287,7 +287,7 @@ export default function Sections() {
 
               {/* Foundations under the walls that stand on the lowest floor */}
               {cuts
-                .filter((cut) => cut.lowest && cut.z1 === lowestLevel)
+                .filter((cut) => cut.lowest && cut.z1 <= lowestLevel)
                 .map((cut) => {
                   const centre = (cut.u1 + cut.u2) / 2;
                   const half = structure.footingWidth / 2;
@@ -367,7 +367,7 @@ export default function Sections() {
                   y={-cut.z2}
                   width={cut.u2 - cut.u1}
                   height={cut.z2 - cut.z1}
-                  fill={solid}
+                  fill={cut.concrete ? concrete : solid}
                   {...heavy}
                 />
               ))}
