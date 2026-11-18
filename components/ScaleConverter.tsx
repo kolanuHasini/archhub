@@ -48,14 +48,14 @@ function UnitPicker({
   onChange: (unit: Unit) => void;
 }) {
   return (
-    <div role="group" aria-label={label} className="flex">
+    <div role="group" aria-label={label} className="flex gap-1">
       {UNITS.map((unit) => (
         <button
           key={unit}
           type="button"
           aria-pressed={value === unit}
           onClick={() => onChange(unit)}
-          className={`-ml-px border px-3 py-1 font-mono text-xs first:ml-0 ${
+          className={`rounded-md border px-3 py-1 font-mono text-xs transition-colors ${
             value === unit
               ? "relative border-accent bg-accent text-accent-ink"
               : "border-line text-muted hover:text-ink"
@@ -96,10 +96,10 @@ export default function ScaleConverter({ presets }: { presets: number[] }) {
   }
 
   const inputClass =
-    "w-full min-w-0 border border-ink bg-paper px-3 py-3 font-mono text-2xl outline-none focus:border-accent focus:ring-1 focus:ring-accent";
+    "w-full min-w-0 rounded-xl border border-line bg-paper px-3 py-3 font-mono text-2xl outline-none focus:border-accent focus:ring-1 focus:ring-accent";
 
   return (
-    <div className="max-w-2xl border border-ink bg-surface">
+    <div className="max-w-2xl overflow-hidden rounded-2xl border border-line bg-surface">
       {/* Scale */}
       <div className="border-b border-line p-4 sm:p-6">
         <p className="font-mono text-xs uppercase tracking-widest text-muted">
@@ -112,10 +112,10 @@ export default function ScaleConverter({ presets }: { presets: number[] }) {
               type="button"
               aria-pressed={preset === value}
               onClick={() => setPreset(value)}
-              className={`border px-4 py-2 font-mono text-sm ${
+              className={`rounded-md border px-4 py-2 font-mono text-sm transition-colors ${
                 preset === value
                   ? "border-accent bg-accent text-accent-ink"
-                  : "border-ink hover:border-accent hover:text-accent"
+                  : "border-ink hover:bg-ink hover:text-paper"
               }`}
             >
               1:{value}
@@ -125,10 +125,10 @@ export default function ScaleConverter({ presets }: { presets: number[] }) {
             type="button"
             aria-pressed={preset === "custom"}
             onClick={() => setPreset("custom")}
-            className={`border px-4 py-2 font-mono text-sm ${
+            className={`rounded-md border px-4 py-2 font-mono text-sm transition-colors ${
               preset === "custom"
                 ? "border-accent bg-accent text-accent-ink"
-                : "border-ink hover:border-accent hover:text-accent"
+                : "border-ink hover:bg-ink hover:text-paper"
             }`}
           >
             Custom
@@ -142,7 +142,7 @@ export default function ScaleConverter({ presets }: { presets: number[] }) {
                 value={customText}
                 onChange={(event) => setCustomText(event.target.value)}
                 aria-label="Custom scale"
-                className="w-24 border border-ink bg-paper px-2 py-2 outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+                className="w-24 rounded-xl border border-line bg-paper px-2 py-2 outline-none focus:border-accent focus:ring-1 focus:ring-accent"
               />
             </label>
           )}

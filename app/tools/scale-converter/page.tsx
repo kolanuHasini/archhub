@@ -14,18 +14,18 @@ export default function ScaleConverterPage() {
     <div className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-8 sm:py-14">
       <Link
         href="/#studio-tools"
-        className="font-mono text-xs text-muted hover:text-accent"
+        className="annotation text-accent hover:underline"
       >
         ← Studio Tools
       </Link>
-      <h1 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">
+      <h1 className="display mt-5 text-5xl sm:text-7xl">
         Scale Converter
       </h1>
-      <p className="mt-3 max-w-2xl leading-relaxed text-muted">
+      <p className="mt-5 max-w-2xl text-lg leading-relaxed text-muted">
         Type a real size to see how long to draw it, or type a drawing size to
         see how big it is in real life.
       </p>
-      <div className="mt-8">
+      <div className="mt-12">
         <ScaleConverter presets={scales.presets} />
       </div>
     </div>

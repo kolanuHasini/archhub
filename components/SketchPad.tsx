@@ -315,14 +315,14 @@ type Drag =
   | { kind: "erase" };
 
 const toolButton = (active: boolean) =>
-  `-ml-px border px-3 py-1.5 font-mono text-xs first:ml-0 ${
+  `rounded-md border px-3 py-1.5 font-mono text-xs transition-colors ${
     active
       ? "relative border-accent bg-accent text-accent-ink"
-      : "border-ink hover:border-accent hover:text-accent"
+      : "border-ink hover:bg-ink hover:text-paper"
   }`;
 
 const actionButton =
-  "border border-ink px-3 py-1.5 font-mono text-xs hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:border-line disabled:text-muted disabled:opacity-60";
+  "rounded-md border border-ink px-3 py-1.5 font-mono text-xs transition-colors hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:border-line disabled:text-muted disabled:opacity-60";
 
 export default function SketchPad({
   storageKey,
@@ -685,7 +685,7 @@ export default function SketchPad({
     <div className="space-y-3">
       {/* Tools */}
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div role="group" aria-label="Drawing tool" className="flex flex-wrap">
+        <div role="group" aria-label="Drawing tool" className="flex flex-wrap gap-1">
           {TOOLS.map((item) => (
             <button
               key={item.id}
@@ -726,7 +726,7 @@ export default function SketchPad({
               title={item.label}
               aria-pressed={color === item.value}
               onClick={() => setColor(item.value)}
-              className={`h-7 w-7 border ${
+              className={`h-7 w-7 rounded-full border ${
                 color === item.value
                   ? "border-accent ring-2 ring-accent ring-offset-2 ring-offset-surface"
                   : "border-ink"
@@ -736,7 +736,7 @@ export default function SketchPad({
           ))}
         </div>
 
-        <div role="group" aria-label="Line thickness" className="flex">
+        <div role="group" aria-label="Line thickness" className="flex gap-1">
           {SIZES.map((item) => (
             <button
               key={item.value}
@@ -827,7 +827,7 @@ export default function SketchPad({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
-        className="block w-full border border-ink"
+        className="block w-full rounded-xl border border-line"
         style={{ touchAction: "none", cursor, backgroundColor: "#ffffff" }}
       >
         <defs>

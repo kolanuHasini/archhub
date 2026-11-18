@@ -198,7 +198,7 @@ function buildSummary(
 const labelClass =
   "block font-mono text-xs uppercase tracking-widest text-muted";
 const fieldClass =
-  "mt-2 w-full border border-ink bg-paper px-3 py-2 outline-none focus:border-accent focus:ring-1 focus:ring-accent";
+  "mt-2 w-full rounded-xl border border-line bg-paper px-3 py-2 outline-none focus:border-accent focus:ring-1 focus:ring-accent";
 
 const STEP_TITLES = [
   "Brief",
@@ -255,7 +255,7 @@ function Step({
   return (
     <section
       id={`step-${index + 1}`}
-      className="scroll-mt-4 border border-ink bg-surface"
+      className="scroll-mt-24 overflow-hidden rounded-2xl border border-line bg-surface"
     >
       <div className="flex items-start justify-between gap-4 border-b border-line p-4 sm:p-6">
         <div>
@@ -264,7 +264,7 @@ function Step({
           <p className="mt-1 text-sm text-muted">{hint}</p>
         </div>
         <span
-          className={`shrink-0 border px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider ${
+          className={`shrink-0 rounded-md border px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider ${
             done
               ? "border-accent bg-accent text-accent-ink"
               : "border-line text-muted"
@@ -277,7 +277,7 @@ function Step({
       <div className="flex justify-end border-t border-line p-4 sm:px-6">
         <a
           href={index + 1 < STEP_TITLES.length ? `#step-${index + 2}` : "#save"}
-          className="bg-accent px-5 py-2.5 text-sm font-medium text-accent-ink hover:opacity-90"
+          className="bg-accent rounded-md px-5 py-2.5 text-sm transition-colors font-medium text-accent-ink hover:opacity-90"
         >
           Next:{" "}
           {index + 1 < STEP_TITLES.length
@@ -456,7 +456,7 @@ export default function ConceptPlanner({
   return (
     <div className="max-w-3xl space-y-6">
       {/* Progress */}
-      <details className="border border-line bg-surface">
+      <details className="rounded-2xl border border-line bg-surface">
         <summary className="cursor-pointer px-4 py-3 font-mono text-xs uppercase tracking-widest text-accent">
           How this works (guide)
         </summary>
@@ -500,10 +500,10 @@ export default function ConceptPlanner({
             <a
               key={title}
               href={`#step-${index + 1}`}
-              className={`border px-2.5 py-1.5 font-mono text-xs ${
+              className={`rounded-md border px-3 py-1.5 font-mono text-xs transition-colors ${
                 stepsDone[index]
                   ? "border-accent bg-accent text-accent-ink"
-                  : "border-ink hover:border-accent hover:text-accent"
+                  : "border-ink hover:bg-ink hover:text-paper"
               }`}
             >
               {String(index + 1).padStart(2, "0")} {title}
@@ -606,7 +606,7 @@ export default function ConceptPlanner({
           </select>
         </div>
         {climate && (
-          <div className="border border-line bg-paper p-4">
+          <div className="rounded-xl border border-line bg-paper p-4">
             <p className="font-mono text-xs uppercase tracking-widest text-accent">
               Strategies to consider
             </p>
@@ -654,12 +654,12 @@ export default function ConceptPlanner({
                 aria-pressed={chosen}
                 disabled={full}
                 onClick={() => toggleDriver(driver.id)}
-                className={`border px-3 py-2 text-left text-sm ${
+                className={`rounded-xl border px-3.5 py-2.5 text-left transition-colors text-sm ${
                   chosen
                     ? "border-accent bg-accent text-accent-ink"
                     : full
                       ? "cursor-not-allowed border-line text-muted opacity-60"
-                      : "border-ink hover:border-accent hover:text-accent"
+                      : "border-ink hover:bg-ink hover:text-paper"
                 }`}
               >
                 {driver.title}
@@ -669,7 +669,7 @@ export default function ConceptPlanner({
         </div>
 
         {chosenDrivers.map((driver) => (
-          <div key={driver.id} className="border border-line bg-paper p-4">
+          <div key={driver.id} className="rounded-xl border border-line bg-paper p-4">
             <h3 className="font-semibold">{driver.title}</h3>
             <p className="mt-1 text-sm italic text-muted">{driver.question}</p>
             <div className="mt-3 grid gap-4 sm:grid-cols-2">
@@ -744,7 +744,7 @@ export default function ConceptPlanner({
         <button
           type="button"
           onClick={writeDraft}
-          className="bg-accent px-5 py-2.5 text-sm font-medium text-accent-ink hover:opacity-90"
+          className="bg-accent rounded-md px-5 py-2.5 text-sm transition-colors font-medium text-accent-ink hover:opacity-90"
         >
           Write a draft from my answers
         </button>
@@ -763,7 +763,7 @@ export default function ConceptPlanner({
         </div>
       </Step>
 
-      <section id="save" className="border border-ink bg-surface p-4 sm:p-6">
+      <section id="save" className="scroll-mt-24 rounded-2xl border border-line bg-surface p-4 sm:p-6">
         <h2 className="text-xl font-semibold tracking-tight">Save and send</h2>
         <p className="mt-1 text-sm text-muted">
           A project file keeps your answers and your sketch together. Save it
@@ -773,28 +773,28 @@ export default function ConceptPlanner({
           <button
             type="button"
             onClick={saveProject}
-            className="bg-accent px-5 py-2.5 text-sm font-medium text-accent-ink hover:opacity-90"
+            className="bg-accent rounded-md px-5 py-2.5 text-sm transition-colors font-medium text-accent-ink hover:opacity-90"
           >
             Save project file
           </button>
           <button
             type="button"
             onClick={shareProject}
-            className="border border-ink px-5 py-2.5 text-sm font-medium hover:border-accent hover:text-accent"
+            className="border border-ink rounded-md px-5 py-2.5 text-sm transition-colors font-medium hover:bg-ink hover:text-paper"
           >
             Share
           </button>
           <button
             type="button"
             onClick={() => fileInputRef.current?.click()}
-            className="border border-ink px-5 py-2.5 text-sm font-medium hover:border-accent hover:text-accent"
+            className="border border-ink rounded-md px-5 py-2.5 text-sm transition-colors font-medium hover:bg-ink hover:text-paper"
           >
             Open project file
           </button>
           <button
             type="button"
             onClick={download}
-            className="border border-ink px-5 py-2.5 text-sm font-medium hover:border-accent hover:text-accent"
+            className="border border-ink rounded-md px-5 py-2.5 text-sm transition-colors font-medium hover:bg-ink hover:text-paper"
           >
             Download summary as text
           </button>
@@ -809,7 +809,7 @@ export default function ConceptPlanner({
         </div>
       </section>
 
-      <section className="border border-ink bg-surface p-4 sm:p-6">
+      <section className="rounded-2xl border border-line bg-surface p-4 sm:p-6">
         <p className="font-mono text-xs uppercase tracking-widest text-accent">
           Next stage
         </p>
@@ -823,7 +823,7 @@ export default function ConceptPlanner({
         </p>
         <Link
           href="/studio/plan"
-          className="mt-4 inline-block bg-accent px-5 py-2.5 text-sm font-medium text-accent-ink hover:opacity-90"
+          className="mt-4 inline-block bg-accent rounded-md px-5 py-2.5 text-sm transition-colors font-medium text-accent-ink hover:opacity-90"
         >
           Next: open the Floor Plan Studio →
         </Link>
@@ -833,7 +833,7 @@ export default function ConceptPlanner({
         <button
           type="button"
           onClick={startOver}
-          className="px-5 py-2.5 text-sm text-muted underline-offset-4 hover:text-ink hover:underline"
+          className="rounded-md px-5 py-2.5 text-sm transition-colors text-muted underline-offset-4 hover:text-ink hover:underline"
         >
           Start over
         </button>

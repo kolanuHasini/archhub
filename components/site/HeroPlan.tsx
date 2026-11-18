@@ -53,17 +53,11 @@ export default function HeroPlan() {
     Math.round(value * MM_PER_UNIT).toLocaleString("en").replace(/,/g, " ");
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-[0_30px_80px_-30px_rgba(0,0,0,0.35)]">
+    <div className="border border-ink bg-surface shadow-[10px_10px_0_0_var(--line)]">
       {/* Title bar */}
-      <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
-        <div className="flex items-center gap-1.5" aria-hidden="true">
-          <span className="h-2.5 w-2.5 rounded-full bg-line" />
-          <span className="h-2.5 w-2.5 rounded-full bg-line" />
-          <span className="h-2.5 w-2.5 rounded-full bg-accent" />
-        </div>
-        <span className="font-mono text-[11px] text-muted">
-          floor-plan · ground floor · 1:100
-        </span>
+      <div className="flex items-center justify-between gap-3 border-b border-ink px-4 py-2.5 font-mono text-[11px] uppercase tracking-wider">
+        <span>Ground floor plan</span>
+        <span className="text-muted">Scale 1:100</span>
       </div>
 
       <svg
@@ -139,7 +133,7 @@ export default function HeroPlan() {
       </svg>
 
       {/* Status line */}
-      <div className="flex items-center justify-between gap-3 border-t border-line px-4 py-2 font-mono text-[11px] text-muted">
+      <div className="flex items-center justify-between gap-3 border-t border-ink px-4 py-2 font-mono text-[11px] text-muted">
         <span className="truncate">
           <span className="text-accent">&gt;</span>{" "}
           {point ? "WALL: click the next point" : "Move over the drawing"}

@@ -75,11 +75,11 @@ export function sitePosition(values: SiteValues): [number, number] | null {
 const labelClass =
   "block font-mono text-xs uppercase tracking-widest text-muted";
 const fieldClass =
-  "mt-2 w-full border border-ink bg-paper px-3 py-2 outline-none focus:border-accent focus:ring-1 focus:ring-accent";
+  "mt-2 w-full rounded-xl border border-line bg-paper px-3 py-2 outline-none focus:border-accent focus:ring-1 focus:ring-accent";
 const headingClass =
   "border-t border-line pt-5 font-mono text-xs uppercase tracking-widest text-accent";
 const smallButton =
-  "border border-ink px-3 py-2 font-mono text-xs hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:border-line disabled:text-muted disabled:opacity-60";
+  "border border-ink rounded-md px-3.5 py-2 font-mono text-xs transition-colors hover:border-accent hover:text-accent disabled:cursor-not-allowed disabled:border-line disabled:text-muted disabled:opacity-60";
 
 function Choice({
   id,
@@ -264,7 +264,7 @@ export default function SiteStudy({
             title="Map of the site"
             src={mapUrl}
             loading="lazy"
-            className="h-72 w-full border border-ink"
+            className="h-72 w-full rounded-xl border border-line"
           />
           <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm">
             <a

@@ -43,9 +43,9 @@ export type InspirationOptions = {
 const labelClass =
   "block font-mono text-xs uppercase tracking-widest text-muted";
 const fieldClass =
-  "mt-2 w-full border border-ink bg-paper px-3 py-2 outline-none focus:border-accent focus:ring-1 focus:ring-accent";
+  "mt-2 w-full rounded-xl border border-line bg-paper px-3 py-2 outline-none focus:border-accent focus:ring-1 focus:ring-accent";
 const smallButton =
-  "border border-ink px-3 py-2 font-mono text-xs hover:border-accent hover:text-accent";
+  "border border-ink rounded-md px-3.5 py-2 font-mono text-xs transition-colors hover:bg-ink hover:text-paper";
 
 export default function Inspiration({
   values,
@@ -130,10 +130,10 @@ export default function Inspiration({
             <img
               src={values.inspImage}
               alt={values.inspName || "Inspiration reference"}
-              className="max-h-56 max-w-full border border-ink bg-white object-contain sm:max-w-xs"
+              className="max-h-56 max-w-full rounded-xl border border-line bg-white object-contain sm:max-w-xs"
             />
           ) : (
-            <div className="flex h-32 w-full items-center justify-center border border-dashed border-line px-4 text-center text-sm text-muted sm:w-64">
+            <div className="flex h-32 w-full items-center justify-center rounded-xl border border-dashed border-line px-4 text-center text-sm text-muted sm:w-64">
               Add a photo or drawing of your inspiration
             </div>
           )}
@@ -150,7 +150,7 @@ export default function Inspiration({
                 <button
                   type="button"
                   onClick={onPlaceOnSketch}
-                  className="bg-accent px-3 py-2 font-mono text-xs text-accent-ink hover:opacity-90"
+                  className="bg-accent rounded-md px-3.5 py-2 font-mono text-xs transition-colors text-accent-ink hover:opacity-90"
                 >
                   Put it on the sketch sheet to trace
                 </button>
@@ -215,7 +215,7 @@ export default function Inspiration({
                 type="button"
                 aria-pressed={chosen}
                 onClick={() => toggleMove(move.id)}
-                className={`border px-3 py-2 text-left ${
+                className={`rounded-xl border px-3.5 py-2.5 text-left transition-colors ${
                   chosen
                     ? "border-accent bg-accent text-accent-ink"
                     : "border-ink hover:border-accent"

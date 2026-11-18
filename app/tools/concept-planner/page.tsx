@@ -14,18 +14,18 @@ export default function ConceptPlannerPage() {
     <div className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-8 sm:py-14">
       <Link
         href="/#studio-tools"
-        className="font-mono text-xs text-muted hover:text-accent"
+        className="annotation text-accent hover:underline"
       >
         ← Studio Tools
       </Link>
-      <h1 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">
+      <h1 className="display mt-5 text-5xl sm:text-7xl">
         Concept Planner
       </h1>
-      <p className="mt-3 max-w-2xl leading-relaxed text-muted">
+      <p className="mt-5 max-w-2xl text-lg leading-relaxed text-muted">
         No concept yet? Work through six short steps and leave with a clear
         idea, a concept sketch, and a concept statement you can present.
       </p>
-      <div className="mt-8">
+      <div className="mt-12">
         <ConceptPlanner
           projectTypes={concepts.projectTypes}
           climates={concepts.climates}
