@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { GLTFExporter } from "three/examples/jsm/exporters/GLTFExporter.js";
+import { OBJExporter } from "three/examples/jsm/exporters/OBJExporter.js";
 import { Sky } from "three/examples/jsm/objects/Sky.js";
 import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { GTAOPass } from "three/examples/jsm/postprocessing/GTAOPass.js";
@@ -349,6 +351,29 @@ export default function View3D() {
     }, "image/png");
   }
 
+  // Saves the 3D model as a file that rendering programs can open, so the
+  // design made here can be finished in D5 Render, Twinmotion, Lumion or Blender.
+  function exportModel(kind: "glb" | "obj") {
+    const stage = stageRef.current;
+    if (!stage?.model) return;
+    const name = `model-${safeFileName(active.name)}`;
+    if (kind === "obj") {
+      const text = new OBJExporter().parse(stage.model.group);
+      downloadBlob(new Blob([text], { type: "text/plain" }), `${name}.obj`);
+      return;
+    }
+    new GLTFExporter().parse(
+      stage.model.group,
+      (result) => {
+        if (result instanceof ArrayBuffer) {
+          downloadBlob(new Blob([result], { type: "model/gltf-binary" }), `${name}.glb`);
+        }
+      },
+      () => window.alert("Sorry, the model could not be exported in this browser."),
+      { binary: true },
+    );
+  }
+
   const chip = (on: boolean) =>
     `rounded-md border px-3.5 py-2 text-[15px] transition-colors ${
       on ? "border-ink bg-ink text-paper" : "border-line hover:border-ink"
@@ -497,6 +522,40 @@ export default function View3D() {
           >
             Save this view as a picture
           </button>
+
+          <section className="rounded-md border border-ink bg-surface">
+            <h2 className="annotation border-b border-line px-5 py-3 text-accent">
+              For photoreal renders
+            </h2>
+            <div className="space-y-3 p-5">
+              <p className="text-[14px] leading-relaxed">
+                Export the model at its exact size and open it in a rendering program such as
+                D5 Render, Twinmotion, Lumion or Blender to add their materials, plants and
+                lighting.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => exportModel("glb")}
+                  disabled={!hasWalls}
+                  className="flex-1 rounded-md bg-ink px-3 py-2 text-[15px] font-medium text-paper transition-colors hover:bg-accent hover:text-accent-ink disabled:opacity-40"
+                >
+                  GLB
+                </button>
+                <button
+                  type="button"
+                  onClick={() => exportModel("obj")}
+                  disabled={!hasWalls}
+                  className="flex-1 rounded-md border border-ink px-3 py-2 text-[15px] font-medium transition-colors hover:bg-ink hover:text-paper disabled:opacity-40"
+                >
+                  OBJ
+                </button>
+              </div>
+              <p className="text-[13px] text-muted">
+                GLB keeps the materials. OBJ is the most widely accepted. The model is in metres.
+              </p>
+            </div>
+          </section>
           <p className="text-[13px] leading-relaxed text-muted">
             The roof and wall material follow the{" "}
             <Link href="/elevations" className="text-accent hover:underline">

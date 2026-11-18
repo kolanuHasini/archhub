@@ -22,6 +22,7 @@ import {
   boxContains,
   boxTouches,
   dist,
+  elemRect,
   entityBox,
   extents,
   mirrorEntity,
@@ -50,6 +51,7 @@ import { PLAN_STYLES, getStyle } from "@/lib/plan/styles";
 import {
   DEFAULT_SETTINGS,
   DOOR_STYLES,
+  ELEM_TYPES,
   EMPTY_PLAN,
   FLOOR_FINISHES,
   GROUND_FLOOR,
@@ -62,6 +64,7 @@ import {
   WINDOW_STYLES,
   layerOf,
   newId,
+  type Elem,
   type Entity,
   type Floor,
   type LayerLook,
@@ -104,7 +107,12 @@ type ToolId =
   | "circle"
   | "arc"
   | "level"
-  | "measure";
+  | "measure"
+  | "column"
+  | "beam"
+  | "stair"
+  | "slab"
+  | "railing";
 
 const TOOLS: { id: ToolId; label: string; key: string; group: string }[] = [
   { id: "select", label: "Select", key: "V", group: "Edit" },
@@ -114,6 +122,11 @@ const TOOLS: { id: ToolId; label: string; key: string; group: string }[] = [
   { id: "door", label: "Door", key: "D", group: "Build" },
   { id: "window", label: "Window", key: "N", group: "Build" },
   { id: "room", label: "Room", key: "R", group: "Build" },
+  { id: "column", label: "Column", key: "K", group: "Structure" },
+  { id: "beam", label: "Beam", key: "J", group: "Structure" },
+  { id: "stair", label: "Stair", key: "S", group: "Structure" },
+  { id: "slab", label: "Slab", key: "Y", group: "Structure" },
+  { id: "railing", label: "Railing", key: "G", group: "Structure" },
   { id: "furn", label: "Furniture", key: "F", group: "Place" },
   { id: "tree", label: "Tree", key: "T", group: "Place" },
   { id: "dim", label: "Dimension", key: "M", group: "Annotate" },
@@ -479,6 +492,9 @@ export default function PlanStudio() {
           kind: "Midpoint",
           owner: entity.id,
         });
+      } else if (entity.kind === "elem") {
+        targets.push({ p: entity.a, kind: entity.type === "column" ? "Column" : "Endpoint", owner: entity.id });
+        if (entity.type !== "column") targets.push({ p: entity.b, kind: "Endpoint", owner: entity.id });
       } else if (entity.kind === "arc") {
         targets.push({ p: entity.a, kind: "Endpoint", owner: entity.id });
         targets.push({ p: entity.b, kind: "Endpoint", owner: entity.id });
@@ -610,6 +626,18 @@ export default function PlanStudio() {
     setBuffer("");
   }
 
+  // A new structural element, with sensible starting sizes for its kind.
+  function makeElem(type: string, a: Pt, b: Pt): Elem {
+    const sizes: Record<string, { w: number; d: number; base: number; h: number }> = {
+      column: { w: 300, d: 300, base: 0, h: settings.wallH },
+      beam: { w: 230, d: 0, base: settings.wallH - 450, h: 450 },
+      stair: { w: 1000, d: 0, base: 0, h: currentFloor.height },
+      slab: { w: 0, d: 0, base: -150, h: 150 },
+      railing: { w: 50, d: 0, base: 0, h: 1000 },
+    };
+    return { id: newId(), kind: "elem", type, a, b, ...sizes[type] };
+  }
+
   function finishRoom() {
     if (points.length < 3) return;
     const room: Room = {
@@ -714,12 +742,22 @@ export default function PlanStudio() {
 
     // Angle lock only applies to tools that draw one straight piece after another.
     const straight =
-      tool === "wall" || tool === "line" || tool === "room" || (tool === "dim" && points.length === 1);
+      ["wall", "line", "room", "beam", "stair", "railing"].includes(tool) ||
+      (tool === "dim" && points.length === 1);
     const from = straight && points.length > 0 ? points[points.length - 1] : null;
     const snapped = snapPoint(raw, from, event.shiftKey);
     const p = snapped.p;
 
-    if (tool === "cwall") {
+    if (tool === "column") {
+      commit([...doc.entities, makeElem("column", p, p)]);
+    } else if (tool === "beam" || tool === "stair" || tool === "slab" || tool === "railing") {
+      if (points.length === 0) {
+        setPoints([p]);
+      } else if (dist(points[0], p) >= 50) {
+        commit([...doc.entities, makeElem(tool, points[0], p)]);
+        setPoints(tool === "railing" ? [p] : []); // railings carry on round a balcony
+      }
+    } else if (tool === "cwall") {
       if (points.length === 0) {
         setPoints([p]);
       } else if (points.length === 1) {
@@ -908,7 +946,12 @@ export default function PlanStudio() {
       setCursor(snapped);
       if (original.kind === "wall" && drag.grip === "m") {
         setOverride({ ...original, m: snapped.p });
-      } else if (original.kind === "wall" || original.kind === "line" || original.kind === "dim") {
+      } else if (
+        original.kind === "wall" ||
+        original.kind === "line" ||
+        original.kind === "dim" ||
+        original.kind === "elem"
+      ) {
         setOverride(
           drag.grip === "a" ? { ...original, a: snapped.p } : { ...original, b: snapped.p },
         );
@@ -924,7 +967,9 @@ export default function PlanStudio() {
       return;
     }
 
-    const chained = tool === "wall" || tool === "line" || tool === "room" || (tool === "dim" && points.length === 1);
+    const chained =
+      ["wall", "line", "room", "beam", "stair", "railing"].includes(tool) ||
+      (tool === "dim" && points.length === 1);
     const from = chained && points.length > 0 ? points[points.length - 1] : null;
     setCursor(snapPoint(raw, from, event.shiftKey));
     if (tool === "door" || tool === "window") {
@@ -1302,6 +1347,11 @@ export default function PlanStudio() {
   let prompt = "";
   if (tool === "select") prompt = "Click to select, Shift-click to add. Drag empty space to box-select. Drag objects to move them.";
   else if (tool === "level") prompt = "LEVEL MARK: click the point, then type its height.";
+  else if (tool === "column") prompt = "COLUMN: click where each column stands. Select one afterwards to change its size.";
+  else if (tool === "beam") prompt = points.length === 0 ? "BEAM: click one end." : "Click the other end.";
+  else if (tool === "stair") prompt = points.length === 0 ? "STAIR: click the bottom step." : "Click the top of the stair.";
+  else if (tool === "slab") prompt = points.length === 0 ? "SLAB: click one corner (balcony, canopy or sunshade)." : "Click the opposite corner.";
+  else if (tool === "railing") prompt = points.length === 0 ? "RAILING: click the start." : "Click the next point. Esc to finish.";
   else if (tool === "measure") {
     prompt = points.length === 0 ? "MEASURE: click the first point." : "Click the second point to read the distance.";
   }
@@ -1439,6 +1489,22 @@ export default function PlanStudio() {
           height={letter * selected.size * 1.3 + 4 * px}
           {...mark}
         />
+      );
+    } else if (selected.kind === "elem") {
+      const outline = elemRect(selected);
+      selectionMark = (
+        <>
+          <rect
+            x={-outline.length / 2 - 4 * px}
+            y={-outline.width / 2 - 4 * px}
+            width={outline.length + 8 * px}
+            height={outline.width + 8 * px}
+            transform={`translate(${outline.centre[0]} ${outline.centre[1]}) rotate(${(outline.angle * 180) / Math.PI})`}
+            {...mark}
+          />
+          {selected.type !== "column" && grip(selected.a, "a")}
+          {selected.type !== "column" && grip(selected.b, "b")}
+        </>
       );
     } else if (selected.kind === "circle") {
       selectionMark = <circle cx={selected.c[0]} cy={selected.c[1]} r={selected.r} {...mark} />;
@@ -1737,6 +1803,54 @@ export default function PlanStudio() {
         </Section>
       );
     }
+    if (entity.kind === "elem") {
+      const name = ELEM_TYPES.find((item) => item.id === entity.type)?.name ?? "Element";
+      const column = entity.type === "column";
+      const slab = entity.type === "slab";
+      return (
+        <Section title={name}>
+          {!column && (
+            <Row label={slab ? "Size" : "Length"}>
+              <span className="text-[#e6e8ec]">
+                {slab
+                  ? `${Math.round(Math.abs(entity.b[0] - entity.a[0]))} x ${Math.round(Math.abs(entity.b[1] - entity.a[1]))} mm`
+                  : formatLength(dist(entity.a, entity.b), settings.unit)}
+              </span>
+            </Row>
+          )}
+          {!slab && (
+            <Row label={column ? "Width" : "Width across"}>
+              <NumInput value={entity.w} min={10} suffix="mm" onCommit={(w) => updateEntity({ ...entity, w })} />
+            </Row>
+          )}
+          {column && (
+            <Row label="Depth">
+              <NumInput value={entity.d} min={10} suffix="mm" onCommit={(d) => updateEntity({ ...entity, d })} />
+            </Row>
+          )}
+          <Row label={entity.type === "stair" ? "Total rise" : slab ? "Thickness" : "Height"}>
+            <NumInput value={entity.h} min={10} suffix="mm" onCommit={(h) => updateEntity({ ...entity, h })} />
+          </Row>
+          <Row label="Starts above floor">
+            <NumInput value={entity.base} suffix="mm" onCommit={(base) => updateEntity({ ...entity, base })} />
+          </Row>
+          {entity.type === "stair" && (
+            <p className="text-[#8b9099]">
+              {Math.max(2, Math.round(entity.h / 170))} steps, each about{" "}
+              {Math.round(entity.h / Math.max(2, Math.round(entity.h / 170)))} mm high and{" "}
+              {Math.round(dist(entity.a, entity.b) / Math.max(2, Math.round(entity.h / 170)))} mm deep.
+            </p>
+          )}
+          {slab && (
+            <p className="text-[#8b9099]">
+              For a balcony keep it at floor level (starts at -150). For a canopy or sunshade, set
+              &ldquo;Starts above floor&rdquo; to its height, for example 2400.
+            </p>
+          )}
+          {actions}
+        </Section>
+      );
+    }
     if (entity.kind === "circle") {
       return (
         <Section title="Circle">
@@ -1990,6 +2104,24 @@ export default function PlanStudio() {
                   strokeDasharray={box.b[0] < box.a[0] ? "5 4" : undefined}
                   pointerEvents="none"
                 />
+              )}
+
+              {["beam", "stair", "slab", "railing"].includes(tool) && points.length > 0 && cursor && (
+                <g pointerEvents="none" stroke={ACCENT} strokeWidth="1.3" fill={ACCENT} fillOpacity="0.12">
+                  {tool === "slab" ? (
+                    <rect
+                      x={Math.min(points[0][0], cursor.p[0])}
+                      y={Math.min(points[0][1], cursor.p[1])}
+                      width={Math.abs(cursor.p[0] - points[0][0])}
+                      height={Math.abs(cursor.p[1] - points[0][1])}
+                    />
+                  ) : (
+                    <line x1={points[0][0]} y1={points[0][1]} x2={cursor.p[0]} y2={cursor.p[1]} strokeWidth="2" />
+                  )}
+                  <text x={cursor.p[0] + 14 * px} y={cursor.p[1] - 12 * px} fontSize={12 * px} fill={ACCENT} fillOpacity="1" stroke={style.paper} strokeWidth="3" paintOrder="stroke">
+                    {formatLength(dist(points[0], cursor.p), settings.unit)}
+                  </text>
+                </g>
               )}
 
               {tool === "cwall" && points.length > 0 && cursor && (

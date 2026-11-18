@@ -154,6 +154,7 @@ function mapPoints(entity: Entity, change: (p: Pt) => Pt): Entity {
       };
     case "line":
     case "dim":
+    case "elem":
       return { ...entity, a: change(entity.a), b: change(entity.b) };
     case "arc":
       return {
@@ -247,6 +248,34 @@ export function arcPath(a: Pt, m: Pt, b: Pt): string {
   const sweep = turn > 0 ? 1 : 0;
   const large = cross(b, m, a) * cross(b, circle.c, a) > 0 ? 1 : 0;
   return `M ${a[0]} ${a[1]} A ${circle.r} ${circle.r} 0 ${large} ${sweep} ${b[0]} ${b[1]}`;
+}
+
+// --- Structural elements -----------------------------------------------------
+
+/** The plan outline of an element: where its middle is, which way it runs, and its size. */
+export function elemRect(elem: Extract<Entity, { kind: "elem" }>): {
+  centre: Pt;
+  angle: number; // radians
+  length: number;
+  width: number;
+} {
+  if (elem.type === "column") {
+    return { centre: elem.a, angle: 0, length: elem.w, width: elem.d };
+  }
+  if (elem.type === "slab") {
+    return {
+      centre: mid(elem.a, elem.b),
+      angle: 0,
+      length: Math.abs(elem.b[0] - elem.a[0]),
+      width: Math.abs(elem.b[1] - elem.a[1]),
+    };
+  }
+  return {
+    centre: mid(elem.a, elem.b),
+    angle: Math.atan2(elem.b[1] - elem.a[1], elem.b[0] - elem.a[0]),
+    length: dist(elem.a, elem.b),
+    width: elem.w,
+  };
 }
 
 // --- Curved walls ------------------------------------------------------------
@@ -381,6 +410,10 @@ export function entityBox(entity: Entity, walls: Wall[]): Box {
       take(entity.a);
       take(entity.b);
       break;
+    case "elem":
+      take(entity.a, Math.max(entity.w, entity.d) / 2);
+      take(entity.b, Math.max(entity.w, entity.d) / 2);
+      break;
     case "arc":
       take(entity.a);
       take(entity.b);
@@ -492,6 +525,10 @@ export function extents(doc: PlanDoc): Box {
         take(entity.a);
         take(entity.b);
         take(entity.m);
+        break;
+      case "elem":
+        take(entity.a, entity.w);
+        take(entity.b, entity.w);
         break;
     }
   }

@@ -1,6 +1,6 @@
 import * as THREE from "three";
 import { getFurniture } from "./furniture";
-import { dist, unit, wallPointAt, wallShape } from "./geometry";
+import { dist, elemRect, unit, wallPointAt, wallShape } from "./geometry";
 import { FINISH_COLOURS } from "./styles";
 import { material, measureBox } from "./textures3d";
 import {
@@ -221,6 +221,35 @@ export function buildModel(
     xs.length > 0
       ? { x1: Math.min(...xs), x2: Math.max(...xs), y1: Math.min(...ys), y2: Math.max(...ys) }
       : { x1: 0, x2: 10000, y1: 0, y2: 8000 };
+
+  // --- Columns, beams, stairs, slabs and railings -------------------------------------
+  for (const elem of entities) {
+    if (elem.kind !== "elem" || !shown(elem)) continue;
+    const level = levelFor(elem) + elem.base;
+    const { centre, angle, length, width } = elemRect(elem);
+    const d: Pt = [Math.cos(angle), Math.sin(angle)];
+    const along = (distance: number): Pt => [
+      centre[0] + d[0] * (distance - length / 2),
+      centre[1] + d[1] * (distance - length / 2),
+    ];
+    if (elem.type === "column" || elem.type === "beam" || elem.type === "slab") {
+      box(centre, angle, length, width, level, elem.h, real("concrete"), true);
+    } else if (elem.type === "stair") {
+      // Each step is a block; they rise one after another along the run.
+      const steps = Math.max(2, Math.round(elem.h / 170));
+      const going = length / steps;
+      for (let i = 0; i < steps; i++) {
+        box(along((i + 0.5) * going), angle, going, width, level, ((i + 1) * elem.h) / steps, real("concrete"));
+      }
+    } else if (elem.type === "railing") {
+      const posts = Math.max(2, Math.round(length / 1200) + 1);
+      for (let i = 0; i < posts; i++) {
+        box(along((length * i) / (posts - 1)), angle, 40, 40, level, elem.h, frameMaterial);
+      }
+      box(centre, angle, length, 55, level + elem.h - 45, 45, frameMaterial); // handrail
+      box(centre, angle, length, 12, level + 90, elem.h - 180, glassMaterial); // glass panel
+    }
+  }
 
   // The outline of the building on one floor. Rooms mark what is indoors, so
   // garden and boundary walls are not roofed over; with no rooms drawn, all

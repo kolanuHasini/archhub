@@ -6,6 +6,7 @@ import {
   arcPath,
   centroid,
   dist,
+  elemRect,
   extents,
   formatArea,
   formatAreaFeet,
@@ -26,6 +27,7 @@ import type {
   Arc,
   Circle,
   Dim,
+  Elem,
   Furn,
   Label,
   Line,
@@ -933,6 +935,64 @@ function PlanDrawing({
           ))}
         </>
       )}
+
+      {/* Columns, beams, stairs, slabs and railings */}
+      {(of("elem") as Elem[]).map((elem) => {
+        const { centre, angle, length, width } = elemRect(elem);
+        const x = -length / 2;
+        const y = -width / 2;
+        const line = { stroke: style.ink, strokeWidth: 1.2, fill: "none" };
+        const steps = Math.max(2, Math.round(length / 280));
+        return (
+          <g
+            key={elem.id}
+            data-id={elem.id}
+            data-layer={layerOf(elem)}
+            transform={`translate(${centre[0]} ${centre[1]}) rotate(${(angle * 180) / Math.PI})`}
+          >
+            <rect x={x} y={y} width={length} height={width} fill="transparent" stroke="transparent" strokeWidth="10" />
+            {elem.type === "column" && (
+              <rect x={x} y={y} width={length} height={width} fill={style.ink} stroke={style.ink} strokeWidth="1.5" />
+            )}
+            {elem.type === "beam" && (
+              <rect x={x} y={y} width={length} height={width} {...line} strokeDasharray="9 5" />
+            )}
+            {elem.type === "slab" && (
+              <>
+                <rect x={x} y={y} width={length} height={width} {...line} strokeDasharray="12 4 2 4" />
+                <line x1={x} y1={y} x2={x + length} y2={y + width} {...line} strokeOpacity="0.4" />
+              </>
+            )}
+            {elem.type === "railing" && (
+              <>
+                <rect x={x} y={y} width={length} height={width} {...line} />
+                <line x1={x} y1={0} x2={x + length} y2={0} {...line} strokeOpacity="0.5" />
+              </>
+            )}
+            {elem.type === "stair" && (
+              <>
+                <rect x={x} y={y} width={length} height={width} {...line} />
+                {Array.from({ length: steps - 1 }, (_, i) => (
+                  <line
+                    key={i}
+                    x1={x + (length * (i + 1)) / steps}
+                    y1={y}
+                    x2={x + (length * (i + 1)) / steps}
+                    y2={y + width}
+                    {...line}
+                    strokeWidth="1"
+                  />
+                ))}
+                {/* The arrow points up the stair. */}
+                <path
+                  d={`M ${x + length * 0.08} 0 H ${x + length * 0.92} M ${x + length * 0.92 - width * 0.2} ${-width * 0.15} L ${x + length * 0.92} 0 L ${x + length * 0.92 - width * 0.2} ${width * 0.15}`}
+                  {...line}
+                />
+              </>
+            )}
+          </g>
+        );
+      })}
 
       {show("openings") &&
         openings.map((opening) => {

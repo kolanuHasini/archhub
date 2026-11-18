@@ -97,6 +97,32 @@ export type Arc = {
   m: Pt;
 };
 
+// A structural or built element with a height: a column, beam, staircase,
+// slab (balcony, canopy or sunshade) or railing.
+//   column  - stands at point a; w and d are its two plan sizes
+//   slab    - a rectangle with a and b as opposite corners
+//   others  - run from a to b, and are w wide
+// `base` is how far above the floor it starts; `h` is how tall it is.
+export type Elem = {
+  id: string;
+  kind: "elem";
+  type: string;
+  a: Pt;
+  b: Pt;
+  w: number;
+  d: number;
+  base: number;
+  h: number;
+};
+
+export const ELEM_TYPES = [
+  { id: "column", name: "Column" },
+  { id: "beam", name: "Beam" },
+  { id: "stair", name: "Staircase" },
+  { id: "slab", name: "Slab (balcony, canopy, sunshade)" },
+  { id: "railing", name: "Railing" },
+];
+
 // A picture placed under the drawing to trace over: a site map, a survey,
 // a scanned plan or a photo of a paper sketch.
 export type Underlay = {
@@ -122,6 +148,7 @@ export type Entity = (
   | Line
   | Circle
   | Arc
+  | Elem
   | Underlay
 ) & { floor?: string; layer?: string };
 
@@ -283,6 +310,7 @@ export const LAYERS: { id: string; name: string }[] = [
   { id: "site", name: "Site boundary" },
   { id: "rooms", name: "Rooms and floors" },
   { id: "walls", name: "Walls" },
+  { id: "structure", name: "Structure, stairs and railings" },
   { id: "openings", name: "Doors and windows" },
   { id: "furniture", name: "Furniture" },
   { id: "landscape", name: "Landscape" },
@@ -316,6 +344,8 @@ export function layerOf(entity: Entity): string {
       return "lines";
     case "image":
       return "underlay";
+    case "elem":
+      return "structure";
   }
 }
 
