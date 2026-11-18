@@ -21,7 +21,7 @@ import {
   wallPointAt,
 } from "@/lib/plan/geometry";
 import { FINISH_COLOURS, getStyle, type PlanStyle } from "@/lib/plan/styles";
-import { layerOf } from "@/lib/plan/types";
+import { fontCss, layerOf } from "@/lib/plan/types";
 import type {
   Arc,
   Circle,
@@ -123,6 +123,26 @@ function FinishPatterns({ style }: { style: PlanStyle }) {
         "M80 120l30 -60M110 120l20 -50M300 260l30 -60M330 260l20 -50M150 420l30 -60M420 90l25 -55M400 440l30 -60",
       )}
       {make("water", 600, 300, "M0 150Q150 80 300 150T600 150")}
+      {make("herringbone", 600, 600, "M0 300L300 0M300 600L600 300M0 300L300 600M300 0L600 300")}
+      {make("pavers", 400, 200, "M0 0H400M0 100H400M0 0V100M200 100V200")}
+      {make(
+        "checker",
+        600,
+        600,
+        "M600 0H0V600",
+        <path d="M0 0H300V300H0ZM300 300H600V600H300Z" fill="currentColor" stroke="none" opacity="0.28" />,
+      )}
+      {make(
+        "terrazzo",
+        500,
+        500,
+        "",
+        <>
+          <path d="M60 70l40 20-30 30ZM300 60l50 10-20 40ZM180 230l30-30 30 40ZM400 280l40 30-50 20ZM90 380l50 0-20 40ZM310 420l30-30 20 40Z" />
+        </>,
+      )}
+      {make("carpet", 200, 200, "M50 50h1M150 150h1M150 50h1M50 150h1")}
+      {make("sand", 300, 300, "M40 60h1M190 30h1M250 170h1M110 200h1M60 270h1M210 250h1")}
       {make("marble", 1200, 1200, "M1200 0H0V1200M150 1050L420 700L380 520M700 200L900 420L1080 380")}
       {make("brick", 480, 240, "M0 0H480M0 120H480M0 0V120M240 0V120M120 120V240M360 120V240")}
       {make("deck", 1800, 140, "M0 0H1800M900 0V140")}
@@ -269,6 +289,35 @@ function TreeView({ tree, style }: { tree: Tree; style: PlanStyle }) {
         />,
       );
     }
+  } else if (tree.style === "flower") {
+    parts.push(
+      <circle key="bg" cx={x} cy={y} r={r} fill={coloured ? pick() : "none"} fillOpacity="0.6" />,
+    );
+    for (let i = 0; i < 9; i++) {
+      const angle = random() * Math.PI * 2;
+      const reach = r * (0.2 + random() * 0.65);
+      parts.push(
+        <circle
+          key={`p${i}`}
+          cx={x + Math.cos(angle) * reach}
+          cy={y + Math.sin(angle) * reach}
+          r={r * 0.09}
+          fill={coloured ? "#d98a9a" : "none"}
+          stroke={coloured ? "none" : undefined}
+        />,
+      );
+    }
+  } else if (tree.style === "bamboo") {
+    for (let i = 0; i < 9; i++) {
+      const angle = random() * Math.PI * 2;
+      const reach = r * random() * 0.75;
+      const cx = x + Math.cos(angle) * reach;
+      const cy = y + Math.sin(angle) * reach;
+      parts.push(
+        <circle key={`b${i}`} cx={cx} cy={cy} r={r * 0.2} fill={coloured ? pick() : "none"} fillOpacity="0.7" />,
+      );
+      parts.push(<circle key={`d${i}`} cx={cx} cy={cy} r={r * 0.04} fill={style.treeLine} />);
+    }
   } else if (tree.style === "conifer") {
     // A pointed star, the usual plan symbol for a pine or fir.
     const points: string[] = [];
@@ -365,6 +414,32 @@ function OpeningView({
           <line x1={-w * 0.08} y1={t / 6} x2={half} y2={t / 6} strokeWidth="2.2" />
         </>
       );
+    } else if (opening.style === "pivot") {
+      // The leaf turns about a point set in from the edge.
+      const pivot = -half + w * 0.2;
+      symbol = (
+        <path
+          d={`M ${pivot} ${-t / 2 - w * 0.2} L ${pivot} ${t / 2 + w * 0.8} A ${w * 0.8} ${w * 0.8} 0 0 0 ${half} ${t / 2}`}
+        />
+      );
+    } else if (opening.style === "double-acting") {
+      symbol = (
+        <>
+          <path d={`M ${-half} ${t / 2} L ${-half} ${t / 2 + w} A ${w} ${w} 0 0 0 ${half} ${t / 2}`} />
+          <path
+            d={`M ${-half} ${-t / 2} L ${-half} ${-t / 2 - w} A ${w} ${w} 0 0 1 ${half} ${-t / 2}`}
+            strokeDasharray="5 4"
+            strokeOpacity="0.7"
+          />
+        </>
+      );
+    } else if (opening.style === "revolving") {
+      symbol = (
+        <>
+          <circle r={half} />
+          <path d={`M ${-half * 0.7} ${-half * 0.7} L ${half * 0.7} ${half * 0.7} M ${-half * 0.7} ${half * 0.7} L ${half * 0.7} ${-half * 0.7}`} />
+        </>
+      );
     } else if (opening.style === "pocket") {
       // The leaf slides into a pocket inside the wall.
       symbol = (
@@ -419,6 +494,15 @@ function OpeningView({
           {frame}
           <line x1={-half} y1={-t / 8} x2={half} y2={-t / 8} />
           <line x1={-half} y1={t / 8} x2={half} y2={t / 8} />
+        </>
+      );
+    } else if (opening.style === "awning") {
+      // Hinged at the top and pushed out at the bottom: shown with a dashed chevron.
+      symbol = (
+        <>
+          {frame}
+          <line x1={-half} y1={0} x2={half} y2={0} />
+          <path d={`M ${-half} ${t / 2} L 0 ${t / 2 + w * 0.18} L ${half} ${t / 2}`} strokeDasharray="5 4" strokeOpacity="0.7" />
         </>
       );
     } else if (opening.style === "bay") {
@@ -915,8 +999,11 @@ function PlanDrawing({
                 x={label.p[0] + (label.level ? size * 0.9 : 0)}
                 y={label.p[1] + (label.level ? size * 0.35 : 0)}
                 fontSize={size}
-                fontFamily={FONT}
-                fill={style.text}
+                fontFamily={fontCss(label.font)}
+                fontWeight={label.bold ? "bold" : "normal"}
+                fontStyle={label.italic ? "italic" : "normal"}
+                fill={label.color || style.text}
+                transform={label.rot ? `rotate(${label.rot} ${label.p[0]} ${label.p[1]})` : undefined}
               >
                 {label.text}
               </text>

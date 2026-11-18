@@ -50,8 +50,9 @@
     },
     {
       "title": "Elevations",
-      "status": "soon",
-      "description": "Generated from your plan and wall heights."
+      "href": "/elevations",
+      "status": "live",
+      "description": "Drawn automatically from your plans and wall heights."
     },
     {
       "title": "Sections",

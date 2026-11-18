@@ -95,7 +95,12 @@ export default function Dashboard() {
           : "Not started",
       href: "/studio/plan",
     },
-    { title: "Elevations", state: "planned", note: "In progress", href: "" },
+    {
+      title: "Elevations",
+      state: plan.walls.length > 0 ? "active" : "todo",
+      note: plan.walls.length > 0 ? "Drawn from your plans" : "Needs a plan first",
+      href: "/elevations",
+    },
     { title: "Sections", state: "planned", note: "In progress", href: "" },
     { title: "3D views", state: "planned", note: "In progress", href: "" },
     { title: "Portfolio", state: "planned", note: "In progress", href: "" },

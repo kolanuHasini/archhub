@@ -66,6 +66,11 @@ export type Label = {
   p: Pt;
   text: string;
   size: number; // 1 = normal lettering size
+  font?: string; // "sans", "serif", "mono" or "hand"
+  bold?: boolean;
+  italic?: boolean;
+  color?: string; // "" or missing = the render style's text colour
+  rot?: number; // degrees, clockwise
   level?: boolean; // true = a level mark (a height above or below ground)
 };
 
@@ -170,6 +175,56 @@ export type Settings = {
   layerLooks: Record<string, LayerLook>; // line weight, colour and lock per layer
   customLayers: { id: string; name: string }[]; // layers you have added
   ghost: boolean; // show the floor below faintly, for lining walls up
+  roof: Roof; // shown in elevations
+  facade: string; // facade material shown in elevations
+};
+
+export type Roof = {
+  type: string; // "flat", "gable", "hip" or "shed"
+  pitch: number; // slope in degrees
+  overhang: number; // how far the eaves stick out
+  parapet: number; // height of the wall around a flat roof
+  turned: boolean; // true = the ridge runs the short way
+};
+
+export const ROOF_TYPES = [
+  { id: "flat", name: "Flat with parapet" },
+  { id: "gable", name: "Gable (two slopes)" },
+  { id: "hip", name: "Hip (four slopes)" },
+  { id: "shed", name: "Shed (one slope)" },
+  { id: "none", name: "No roof shown" },
+];
+
+export const FACADE_MATERIALS = [
+  { id: "plaster", name: "Smooth plaster" },
+  { id: "brick", name: "Exposed brick" },
+  { id: "concrete", name: "Board-marked concrete" },
+  { id: "stone", name: "Stone" },
+  { id: "timber", name: "Timber cladding" },
+  { id: "whitewash", name: "White lime wash" },
+  { id: "tile", name: "Tile cladding" },
+  { id: "metal", name: "Standing-seam metal" },
+  { id: "glass", name: "Glass curtain wall" },
+  { id: "jali", name: "Perforated brick (jali)" },
+];
+
+export const TEXT_FONTS = [
+  { id: "sans", name: "Sans (clean)", css: "Arial, Helvetica, sans-serif" },
+  { id: "serif", name: "Serif (classic)", css: "Georgia, 'Times New Roman', serif" },
+  { id: "mono", name: "Mono (technical)", css: "'Courier New', Consolas, monospace" },
+  { id: "hand", name: "Hand lettering", css: "'Segoe Print', 'Bradley Hand', 'Comic Sans MS', cursive" },
+  { id: "narrow", name: "Narrow (titles)", css: "'Arial Narrow', 'Roboto Condensed', Impact, sans-serif" },
+];
+
+export const fontCss = (id: string | undefined) =>
+  (TEXT_FONTS.find((font) => font.id === id) ?? TEXT_FONTS[0]).css;
+
+export const DEFAULT_ROOF: Roof = {
+  type: "flat",
+  pitch: 25,
+  overhang: 450,
+  parapet: 600,
+  turned: false,
 };
 
 export type PlanDoc = {
@@ -196,6 +251,8 @@ export const DEFAULT_SETTINGS: Settings = {
   layerLooks: {},
   customLayers: [],
   ghost: true,
+  roof: { type: "flat", pitch: 25, overhang: 450, parapet: 600, turned: false },
+  facade: "plaster",
 };
 
 export const EMPTY_PLAN: PlanDoc = {
@@ -252,6 +309,9 @@ export const DOOR_STYLES = [
   { id: "pocket", name: "Pocket (slides into wall)", width: 900 },
   { id: "bifold", name: "Bifold", width: 1800 },
   { id: "garage", name: "Garage / shutter", width: 2700 },
+  { id: "pivot", name: "Pivot", width: 1200 },
+  { id: "double-acting", name: "Double-acting (swings both ways)", width: 900 },
+  { id: "revolving", name: "Revolving", width: 2000 },
   { id: "opening", name: "Open archway", width: 1200 },
 ];
 
@@ -263,6 +323,9 @@ export const WINDOW_STYLES = [
   { id: "bay", name: "Bay window", width: 2100 },
   { id: "louvre", name: "Louvre", width: 900 },
   { id: "french", name: "French window", width: 1500 },
+  { id: "awning", name: "Awning (top-hung)", width: 900 },
+  { id: "arched", name: "Arched", width: 1000 },
+  { id: "clerestory", name: "Clerestory strip", width: 2400 },
 ];
 
 export const TREE_STYLES = [
@@ -271,6 +334,8 @@ export const TREE_STYLES = [
   { id: "palm", name: "Palm" },
   { id: "shrub", name: "Shrub" },
   { id: "conifer", name: "Conifer" },
+  { id: "flower", name: "Flowering tree" },
+  { id: "bamboo", name: "Bamboo clump" },
 ];
 
 export const FLOOR_FINISHES = [
@@ -284,6 +349,12 @@ export const FLOOR_FINISHES = [
   { id: "brick", name: "Brick paving" },
   { id: "deck", name: "Timber deck" },
   { id: "gravel", name: "Gravel" },
+  { id: "herringbone", name: "Herringbone wood" },
+  { id: "checker", name: "Checker tiles" },
+  { id: "terrazzo", name: "Terrazzo" },
+  { id: "carpet", name: "Carpet" },
+  { id: "pavers", name: "Brick pavers" },
+  { id: "sand", name: "Sand" },
   { id: "grass", name: "Grass" },
   { id: "water", name: "Water" },
 ];

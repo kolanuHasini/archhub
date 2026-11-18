@@ -56,6 +56,7 @@ import {
   LAYERS,
   LINE_WEIGHTS,
   SCALES,
+  TEXT_FONTS,
   TREE_STYLES,
   WALL_THICKNESSES,
   WINDOW_STYLES,
@@ -102,7 +103,8 @@ type ToolId =
   | "rect"
   | "circle"
   | "arc"
-  | "level";
+  | "level"
+  | "measure";
 
 const TOOLS: { id: ToolId; label: string; key: string; group: string }[] = [
   { id: "select", label: "Select", key: "V", group: "Edit" },
@@ -116,6 +118,7 @@ const TOOLS: { id: ToolId; label: string; key: string; group: string }[] = [
   { id: "tree", label: "Tree", key: "T", group: "Place" },
   { id: "dim", label: "Dimension", key: "M", group: "Annotate" },
   { id: "level", label: "Level mark", key: "E", group: "Annotate" },
+  { id: "measure", label: "Measure", key: "Q", group: "Annotate" },
   { id: "line", label: "Line", key: "L", group: "Draft" },
   { id: "rect", label: "Rectangle", key: "B", group: "Draft" },
   { id: "circle", label: "Circle", key: "C", group: "Draft" },
@@ -788,10 +791,25 @@ export default function PlanStudio() {
     } else if (tool === "text") {
       const text = window.prompt("Text to place on the drawing:");
       if (text && text.trim()) {
+        const id = newId();
         commit([
           ...doc.entities,
-          { id: newId(), kind: "text", p, text: text.trim().slice(0, 200), size: 1 },
+          { id, kind: "text", p, text: text.trim().slice(0, 200), size: 1 },
         ]);
+        // Select it straight away, so its font, size and colour can be set.
+        setToolState("select");
+        setSelectedId(id);
+      }
+    } else if (tool === "measure") {
+      if (points.length === 0) {
+        setPoints([p]);
+        setNotice("");
+      } else {
+        const length = dist(points[0], p);
+        setNotice(
+          `Distance: ${formatLength(length, "mm")} mm  =  ${formatLength(length, "m")}  =  ${formatLength(length, "ft")}`,
+        );
+        setPoints([]);
       }
     } else if (tool === "level") {
       const text = window.prompt(
@@ -1284,6 +1302,9 @@ export default function PlanStudio() {
   let prompt = "";
   if (tool === "select") prompt = "Click to select, Shift-click to add. Drag empty space to box-select. Drag objects to move them.";
   else if (tool === "level") prompt = "LEVEL MARK: click the point, then type its height.";
+  else if (tool === "measure") {
+    prompt = points.length === 0 ? "MEASURE: click the first point." : "Click the second point to read the distance.";
+  }
   else if (tool === "rect") {
     prompt =
       points.length === 0
@@ -1670,6 +1691,34 @@ export default function PlanStudio() {
           <Row label="Size">
             <NumInput value={entity.size} min={0.2} suffix="x" onCommit={(next) => updateEntity({ ...entity, size: next })} />
           </Row>
+          <Row label="Font">
+            <Select value={entity.font ?? "sans"} options={TEXT_FONTS} onChange={(font) => updateEntity({ ...entity, font })} />
+          </Row>
+          <div className="flex flex-wrap gap-1.5">
+            <Btn active={entity.bold === true} onClick={() => updateEntity({ ...entity, bold: !entity.bold })}>
+              Bold
+            </Btn>
+            <Btn active={entity.italic === true} onClick={() => updateEntity({ ...entity, italic: !entity.italic })}>
+              Italic
+            </Btn>
+            <Btn onClick={() => updateEntity({ ...entity, text: entity.text.toUpperCase() })}>CAPITALS</Btn>
+          </div>
+          <Row label="Rotation">
+            <NumInput value={entity.rot ?? 0} suffix="°" onCommit={(rot) => updateEntity({ ...entity, rot })} />
+            <Btn onClick={() => updateEntity({ ...entity, rot: ((entity.rot ?? 0) + 90) % 360 })}>+90°</Btn>
+          </Row>
+          <Row label="Colour">
+            <input
+              type="color"
+              value={entity.color || "#1f1f1f"}
+              onChange={(event) => updateEntity({ ...entity, color: event.target.value })}
+              aria-label="Text colour"
+              className="h-7 w-10 cursor-pointer rounded border border-[#3a3e45] bg-transparent"
+            />
+            <Btn onClick={() => updateEntity({ ...entity, color: "" })} disabled={!entity.color}>
+              Reset
+            </Btn>
+          </Row>
           {actions}
         </Section>
       );
@@ -1781,6 +1830,13 @@ export default function PlanStudio() {
         <Btn onClick={() => setView(null)} title="Show the whole drawing">
           Fit
         </Btn>
+        <Link
+          href="/elevations"
+          title="See the elevations drawn from these plans"
+          className="ml-1 flex h-7 shrink-0 items-center rounded border border-[#3a3e45] bg-[#26282d] px-2.5 text-[12px] text-[#d7d9de] hover:border-[#6b7280]"
+        >
+          Elevations →
+        </Link>
         <span className="flex-1" />
         <Btn
           onClick={() => {
@@ -2006,6 +2062,15 @@ export default function PlanStudio() {
                     strokeWidth="1.2"
                   />
                   <circle cx={points[0][0]} cy={points[0][1]} r={6 * px} fill="none" stroke={ACCENT} strokeWidth="1.5" />
+                </g>
+              )}
+
+              {tool === "measure" && points.length > 0 && cursor && (
+                <g pointerEvents="none">
+                  <line x1={points[0][0]} y1={points[0][1]} x2={cursor.p[0]} y2={cursor.p[1]} stroke={ACCENT} strokeWidth="1.2" strokeDasharray="5 4" />
+                  <text x={cursor.p[0] + 14 * px} y={cursor.p[1] - 12 * px} fontSize={12 * px} fill={ACCENT} stroke={style.paper} strokeWidth="3" paintOrder="stroke">
+                    {formatLength(dist(points[0], cursor.p), settings.unit)}
+                  </text>
                 </g>
               )}
 

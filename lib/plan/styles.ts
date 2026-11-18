@@ -199,6 +199,12 @@ export const FINISH_COLOURS: Record<string, { fill: string; line: string }> = {
   brick: { fill: "#c98566", line: "#a5644a" },
   deck: { fill: "#c9a273", line: "#9d7748" },
   gravel: { fill: "#e4dfd3", line: "#aaa392" },
+  herringbone: { fill: "#d6b281", line: "#b08a57" },
+  checker: { fill: "#f2efe8", line: "#9a9890" },
+  terrazzo: { fill: "#ebe6dc", line: "#a89f8f" },
+  carpet: { fill: "#c9c3d1", line: "#aaa2b6" },
+  pavers: { fill: "#c98f73", line: "#a56a50" },
+  sand: { fill: "#eadcb8", line: "#c9b78a" },
   grass: { fill: "#cfdcb6", line: "#9db384" },
   water: { fill: "#cfe4ec", line: "#8fbccd" },
 };
