@@ -12,7 +12,7 @@ import {
   TextInput,
   Toggle,
 } from "@/components/plan/ui";
-import { downloadBlob } from "@/lib/download";
+import { downloadBlob, safeFileName } from "@/lib/download";
 import { dropOrphanOpenings, exportDxf, importDxf } from "@/lib/plan/dxf";
 import { FURNITURE, getFurniture } from "@/lib/plan/furniture";
 import {
@@ -52,7 +52,9 @@ import {
   DOOR_STYLES,
   EMPTY_PLAN,
   FLOOR_FINISHES,
+  GROUND_FLOOR,
   LAYERS,
+  LINE_WEIGHTS,
   SCALES,
   TREE_STYLES,
   WALL_THICKNESSES,
@@ -60,6 +62,8 @@ import {
   layerOf,
   newId,
   type Entity,
+  type Floor,
+  type LayerLook,
   type Opening,
   type PlanDoc,
   type Pt,
@@ -149,7 +153,27 @@ function fitView(box: Box, size: { w: number; h: number }): View {
   return {
     cx: box.x + box.w / 2,
     cy: box.y + box.h / 2,
-    zoom: Math.min(Math.max(zoom, 0.004), 2),
+    zoom: Math.min(Math.max(zoom, 0.0005), 2),
+  };
+}
+
+/** Tidies a saved plan: every plan has at least one floor, and every object a floor. */
+function normalizePlan(plan: Partial<PlanDoc> | null | undefined): PlanDoc {
+  const floors =
+    Array.isArray(plan?.floors) && plan.floors.length > 0
+      ? plan.floors.filter((f) => f && typeof f.id === "string")
+      : [GROUND_FLOOR];
+  const safeFloors = floors.length > 0 ? floors : [GROUND_FLOOR];
+  const known = new Set(safeFloors.map((f) => f.id));
+  const fallback = known.has(GROUND_FLOOR.id) ? GROUND_FLOOR.id : safeFloors[0].id;
+  const entities = (Array.isArray(plan?.entities) ? plan.entities.filter(isEntity) : []).map(
+    (e) => (e.floor && known.has(e.floor) ? e : { ...e, floor: fallback }),
+  );
+  return {
+    floors: safeFloors,
+    entities,
+    site: plan?.site && Number.isFinite(plan.site.w) ? plan.site : null,
+    settings: { ...DEFAULT_SETTINGS, ...(plan?.settings ?? {}) },
   };
 }
 
@@ -157,16 +181,13 @@ function readPlanFile(text: string): PlanDoc | null {
   try {
     const data = JSON.parse(text);
     if (!data || data.app !== "archhub" || data.kind !== "plan") return null;
-    const plan = data.plan ?? {};
-    return {
-      entities: Array.isArray(plan.entities) ? plan.entities.filter(isEntity) : [],
-      site: plan.site && Number.isFinite(plan.site.w) ? plan.site : null,
-      settings: { ...DEFAULT_SETTINGS, ...(plan.settings ?? {}) },
-    };
+    return normalizePlan(data.plan ?? {});
   } catch {
     return null;
   }
 }
+
+const ORDINALS = ["First", "Second", "Third", "Fourth", "Fifth", "Sixth", "Seventh", "Eighth", "Ninth", "Tenth"];
 
 /** A clean copy of the drawing (no grid or tool marks), fitted to its extents. */
 function buildExportSvg(svg: SVGSVGElement, doc: PlanDoc) {
@@ -191,7 +212,7 @@ function buildExportSvg(svg: SVGSVGElement, doc: PlanDoc) {
   copy.setAttribute("viewBox", `${x} ${y} ${w} ${h}`);
   copy.setAttribute("width", String(Math.round(w * pixels)));
   copy.setAttribute("height", String(Math.round(h * pixels)));
-  copy.removeAttribute("class");
+  // The class stays: it carries the rule that keeps line weights in pixels.
   copy.removeAttribute("style");
   return {
     source: new XMLSerializer().serializeToString(copy),
@@ -202,15 +223,21 @@ function buildExportSvg(svg: SVGSVGElement, doc: PlanDoc) {
 
 export default function PlanStudio() {
   const [saved, saveDoc] = useSavedState(STORAGE_KEY, EMPTY_PLAN);
+  // `full` is the whole building (every floor). `doc` is just the floor being
+  // worked on, which is what all the drawing tools see.
+  const full: PlanDoc = useMemo(() => normalizePlan(saved), [saved]);
+  const floors = useMemo(
+    () => [...(full.floors ?? [GROUND_FLOOR])].sort((a, b) => b.level - a.level),
+    [full.floors],
+  );
+  const [floorId, setFloorId] = useState(GROUND_FLOOR.id);
+  const currentFloor = floors.find((f) => f.id === floorId) ?? floors[floors.length - 1];
   const doc: PlanDoc = useMemo(
-    () => ({
-      entities: Array.isArray(saved.entities) ? saved.entities.filter(isEntity) : [],
-      site: saved.site && Number.isFinite(saved.site.w) ? saved.site : null,
-      settings: { ...DEFAULT_SETTINGS, ...(saved.settings ?? {}) },
-    }),
-    [saved],
+    () => ({ ...full, entities: full.entities.filter((e) => e.floor === currentFloor.id) }),
+    [full, currentFloor.id],
   );
   const { settings } = doc;
+  const isLocked = (entity: Entity) => settings.layerLooks?.[layerOf(entity)]?.locked === true;
 
   const [tool, setToolState] = useState<ToolId>("wall");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -273,28 +300,142 @@ export default function PlanStudio() {
 
   // --- Saving, undo, redo ------------------------------------------------------
 
-  function commit(entities: Entity[], extra?: Partial<PlanDoc>) {
-    setPast([...past, doc].slice(-HISTORY_LIMIT));
+  /** Saves a change to the whole building, remembering the old state for Undo. */
+  function saveFull(next: PlanDoc) {
+    setPast([...past, full].slice(-HISTORY_LIMIT));
     setFuture([]);
-    saveDoc({ ...doc, entities, ...extra });
+    saveDoc(next);
+  }
+
+  /** Saves the objects of the current floor; other floors are left untouched. */
+  function commit(entities: Entity[], extra?: Partial<PlanDoc>) {
+    const others = full.entities.filter((e) => e.floor !== currentFloor.id);
+    const mine = entities.map((e) =>
+      e.floor === currentFloor.id ? e : { ...e, floor: currentFloor.id },
+    );
+    saveFull({ ...full, entities: [...others, ...mine], ...extra });
   }
 
   function undo() {
     if (past.length === 0) return;
-    setFuture([doc, ...future]);
+    setFuture([full, ...future]);
     saveDoc(past[past.length - 1]);
     setPast(past.slice(0, -1));
   }
 
   function redo() {
     if (future.length === 0) return;
-    setPast([...past, doc]);
+    setPast([...past, full]);
     saveDoc(future[0]);
     setFuture(future.slice(1));
   }
 
   function setSettings(changes: Partial<Settings>) {
-    saveDoc({ ...doc, settings: { ...settings, ...changes } });
+    saveDoc({ ...full, settings: { ...settings, ...changes } });
+  }
+
+  // --- Floors ------------------------------------------------------------------
+
+  function switchFloor(id: string) {
+    setFloorId(id);
+    setSelectedIds([]);
+    setPoints([]);
+    setBuffer("");
+  }
+
+  function addFloor(where: "above" | "below", copyCurrent = false) {
+    const top = floors[0];
+    const bottom = floors[floors.length - 1];
+    const id = newId();
+    let floor: Floor;
+    if (where === "above") {
+      const storeysAbove = floors.filter((f) => f.level > 0).length;
+      floor = {
+        id,
+        name: storeysAbove < ORDINALS.length ? `${ORDINALS[storeysAbove]} floor` : `Floor ${storeysAbove + 1}`,
+        level: top.level + top.height,
+        height: top.height,
+      };
+    } else {
+      const basements = floors.filter((f) => f.level < 0).length;
+      floor = { id, name: `Basement ${basements + 1}`, level: bottom.level - 3000, height: 3000 };
+    }
+    let copies: Entity[] = [];
+    if (copyCurrent) {
+      // Copy this floor's objects up, keeping doors and windows on their walls.
+      const wallIds = new Map<string, string>();
+      for (const e of doc.entities) if (e.kind === "wall") wallIds.set(e.id, newId());
+      copies = doc.entities
+        .filter((e) => e.kind !== "image")
+        .map((e) => {
+          if (e.kind === "wall") return { ...e, id: wallIds.get(e.id)!, floor: id };
+          if (e.kind === "door" || e.kind === "window") {
+            return { ...e, id: newId(), wallId: wallIds.get(e.wallId) ?? e.wallId, floor: id };
+          }
+          return { ...e, id: newId(), floor: id };
+        });
+    }
+    saveFull({ ...full, floors: [...floors, floor], entities: [...full.entities, ...copies] });
+    switchFloor(id);
+  }
+
+  function updateFloor(changes: Partial<Floor>) {
+    saveFull({
+      ...full,
+      floors: floors.map((f) => (f.id === currentFloor.id ? { ...f, ...changes } : f)),
+    });
+  }
+
+  function deleteFloor() {
+    if (floors.length < 2) return;
+    if (!window.confirm(`Delete "${currentFloor.name}" and everything drawn on it? You can undo this.`)) return;
+    const remaining = floors.filter((f) => f.id !== currentFloor.id);
+    saveFull({
+      ...full,
+      floors: remaining,
+      entities: full.entities.filter((e) => e.floor !== currentFloor.id),
+    });
+    switchFloor(remaining[remaining.length - 1].id);
+  }
+
+  // The floor directly below, shown faintly so walls can be lined up.
+  const floorBelow = floors.find((f) => f.level < currentFloor.level);
+  const ghostWalls = useMemo(
+    () =>
+      floorBelow
+        ? full.entities.filter((e): e is Wall => e.kind === "wall" && e.floor === floorBelow.id)
+        : [],
+    [full.entities, floorBelow],
+  );
+
+  function setLayerLook(layer: string, changes: Partial<LayerLook>) {
+    const looks = { ...(settings.layerLooks ?? {}) };
+    looks[layer] = { ...looks[layer], ...changes };
+    setSettings({ layerLooks: looks });
+  }
+
+  const allLayers = [...LAYERS, ...(settings.customLayers ?? [])];
+
+  function addLayer() {
+    const name = window.prompt("Name for the new layer (for example: Electrical, Plumbing, Grid lines):");
+    if (!name || !name.trim()) return;
+    setSettings({
+      customLayers: [...(settings.customLayers ?? []), { id: `c-${newId()}`, name: name.trim().slice(0, 40) }],
+    });
+  }
+
+  // Moves the selected objects onto a layer.
+  function assignLayer(layer: string) {
+    commit(
+      doc.entities.map((e) => {
+        if (!selectedIds.includes(e.id)) return e;
+        const natural = layerOf({ ...e, layer: undefined });
+        const next = { ...e };
+        if (layer === natural) delete next.layer;
+        else next.layer = layer;
+        return next;
+      }),
+    );
   }
 
   function updateEntity(next: Entity) {
@@ -434,7 +575,7 @@ export default function PlanStudio() {
       const offsetX = event.clientX - rect.left - rect.width / 2;
       const offsetY = event.clientY - rect.top - rect.height / 2;
       const zoom = Math.min(
-        Math.max(current.zoom * (event.deltaY < 0 ? 1.15 : 1 / 1.15), 0.003),
+        Math.max(current.zoom * (event.deltaY < 0 ? 1.15 : 1 / 1.15), 0.0004),
         4,
       );
       const modelX = current.cx + offsetX / current.zoom;
@@ -446,7 +587,7 @@ export default function PlanStudio() {
   }, []);
 
   function zoomBy(factor: number) {
-    setView({ ...v, zoom: Math.min(Math.max(v.zoom * factor, 0.003), 4) });
+    setView({ ...v, zoom: Math.min(Math.max(v.zoom * factor, 0.0004), 4) });
   }
 
   // --- Making things -------------------------------------------------------------------
@@ -522,7 +663,8 @@ export default function PlanStudio() {
         return;
       }
       const id = element?.closest("[data-id]")?.getAttribute("data-id");
-      const hit = id ? doc.entities.find((e) => e.id === id) : undefined;
+      const found = id ? doc.entities.find((e) => e.id === id) : undefined;
+      const hit = found && !isLocked(found) ? found : undefined;
       event.currentTarget.setPointerCapture(event.pointerId);
       if (!hit) {
         // Empty space: start a selection box.
@@ -786,7 +928,7 @@ export default function PlanStudio() {
       if (area.w > 4 * px || area.h > 4 * px) {
         setSelectedIds(
           doc.entities
-            .filter((e) => e.kind !== "image" && !settings.hidden.includes(layerOf(e)))
+            .filter((e) => e.kind !== "image" && !settings.hidden.includes(layerOf(e)) && !isLocked(e))
             .filter((e) => {
               const own = entityBox(e, walls);
               return crossing ? boxTouches(area, own) : boxContains(area, own);
@@ -811,13 +953,13 @@ export default function PlanStudio() {
 
   function newDrawing() {
     if (doc.entities.length > 0 && !window.confirm("Start a new, empty drawing? You can undo this.")) return;
-    commit([], { site: null });
-    setSelectedId(null);
+    saveFull({ ...full, floors: [GROUND_FLOOR], entities: [], site: null });
+    switchFloor(GROUND_FLOOR.id);
     setView(null);
   }
 
   function saveProject() {
-    const data = { app: "archhub", kind: "plan", version: 1, plan: doc };
+    const data = { app: "archhub", kind: "plan", version: 2, plan: full };
     downloadBlob(
       new Blob([JSON.stringify(data)], { type: "application/json" }),
       "floor-plan.archhub.json",
@@ -833,10 +975,8 @@ export default function PlanStudio() {
       window.alert("That file could not be opened. Choose a plan saved from this studio (it ends in .archhub.json).");
       return;
     }
-    setPast([...past, doc].slice(-HISTORY_LIMIT));
-    setFuture([]);
-    saveDoc(opened);
-    setSelectedId(null);
+    saveFull(opened);
+    switchFloor(opened.floors?.find((f) => f.id === GROUND_FLOOR.id)?.id ?? opened.floors![0].id);
     setView(null);
   }
 
@@ -981,12 +1121,14 @@ export default function PlanStudio() {
     setBuffer("");
   }
 
+  const exportName = `floor-plan-${safeFileName(currentFloor.name, "floor")}`;
+
   function exportImage(kind: "png" | "svg") {
     const svg = svgRef.current;
     if (!svg) return;
     const { source, width, height } = buildExportSvg(svg, doc);
     if (kind === "svg") {
-      downloadBlob(new Blob([source], { type: "image/svg+xml" }), "floor-plan.svg");
+      downloadBlob(new Blob([source], { type: "image/svg+xml" }), `${exportName}.svg`);
       return;
     }
     const image = new Image();
@@ -998,7 +1140,7 @@ export default function PlanStudio() {
       if (!context) return;
       context.drawImage(image, 0, 0, width, height);
       canvas.toBlob((blob) => {
-        if (blob) downloadBlob(blob, "floor-plan.png");
+        if (blob) downloadBlob(blob, `${exportName}.png`);
       }, "image/png");
     };
     image.onerror = () => window.alert("Sorry, the image could not be created in this browser.");
@@ -1006,7 +1148,7 @@ export default function PlanStudio() {
   }
 
   function exportDxfFile() {
-    downloadBlob(new Blob([exportDxf(doc)], { type: "application/dxf" }), "floor-plan.dxf");
+    downloadBlob(new Blob([exportDxf(doc)], { type: "application/dxf" }), `${exportName}.dxf`);
   }
 
   function useSiteStudy() {
@@ -1048,7 +1190,7 @@ export default function PlanStudio() {
         if (lower === "a") {
           event.preventDefault();
           setToolState("select");
-          setSelectedIds(doc.entities.filter((e) => e.kind !== "image").map((e) => e.id));
+          setSelectedIds(doc.entities.filter((e) => e.kind !== "image" && !isLocked(e)).map((e) => e.id));
           return;
         }
         if (lower === "d") {
@@ -1179,7 +1321,7 @@ export default function PlanStudio() {
   const viewWidth = size.w / v.zoom;
   const viewHeight = size.h / v.zoom;
 
-  const gridStep = [50, 100, 500, 1000, 5000, 10000, 50000, 100000].find((s) => s * v.zoom >= 14) ?? 100000;
+  const gridStep = [50, 100, 500, 1000, 5000, 10000, 50000, 100000, 500000].find((s) => s * v.zoom >= 14) ?? 500000;
   const gridLines: React.ReactNode[] = [];
   if (settings.grid) {
     for (let x = Math.ceil(left / gridStep) * gridStep; x < left + viewWidth; x += gridStep) {
@@ -1308,6 +1450,10 @@ export default function PlanStudio() {
   }
 
   const totalArea = rooms.reduce((sum, room) => sum + polygonArea(room.pts), 0);
+  const buildingArea = full.entities.reduce(
+    (sum, e) => (e.kind === "room" ? sum + polygonArea(e.pts) : sum),
+    0,
+  );
   const canvasCursor = tool === "pan" ? "grab" : tool === "select" ? "default" : "crosshair";
   const groups = [...new Set(TOOLS.map((item) => item.group))];
   const furnitureGroups = [...new Set(FURNITURE.map((item) => item.group))];
@@ -1585,6 +1731,19 @@ export default function PlanStudio() {
         <span className="mr-2 shrink-0 border-l border-[#3a3e45] pl-3 text-[13px] text-[#b4b8c0]">
           Floor Plan Studio
         </span>
+        <select
+          value={currentFloor.id}
+          onChange={(event) => switchFloor(event.target.value)}
+          aria-label="Floor"
+          title="Switch floor"
+          className="mr-1 h-7 shrink-0 rounded border border-[#4c8dff] bg-[#15161a] px-2 text-[12px] text-white outline-none"
+        >
+          {floors.map((floor) => (
+            <option key={floor.id} value={floor.id}>
+              {floor.name}
+            </option>
+          ))}
+        </select>
         <Btn onClick={newDrawing}>New</Btn>
         <Btn onClick={() => openRef.current?.click()}>Open</Btn>
         <Btn onClick={saveProject}>Save</Btn>
@@ -1683,6 +1842,21 @@ export default function PlanStudio() {
             <g data-export="skip" stroke={style.grid} strokeWidth="1" pointerEvents="none">
               {gridLines}
             </g>
+
+            {settings.ghost && ghostWalls.length > 0 && (
+              <g data-export="skip" pointerEvents="none" opacity="0.3">
+                {ghostWalls.map((wall) => (
+                  <path
+                    key={wall.id}
+                    d={wallOutline(wall, ghostWalls)}
+                    fill="none"
+                    stroke={style.ink}
+                    strokeWidth="1"
+                    strokeDasharray="6 4"
+                  />
+                ))}
+              </g>
+            )}
 
             <PlanDrawing doc={shown} activeId={selectedId} />
 
@@ -1912,6 +2086,71 @@ export default function PlanStudio() {
               panelOpen === null ? "hidden md:block" : panelOpen ? "block" : "hidden"
             }`}
           >
+            <Section title="Floors">
+              <div className="space-y-0.5">
+                {floors.map((floor) => (
+                  <button
+                    key={floor.id}
+                    type="button"
+                    aria-pressed={floor.id === currentFloor.id}
+                    onClick={() => switchFloor(floor.id)}
+                    className={`flex h-7 w-full items-center justify-between rounded px-2 text-left ${
+                      floor.id === currentFloor.id ? "bg-[#4c8dff] text-white" : "hover:bg-[#2c2f35]"
+                    }`}
+                  >
+                    <span>{floor.name}</span>
+                    <span className={`font-mono text-[10px] ${floor.id === currentFloor.id ? "text-white/85" : "text-[#8b9099]"}`}>
+                      {floor.level >= 0 ? "+" : ""}
+                      {(floor.level / 1000).toFixed(2)} m
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-1.5 pt-1">
+                <Btn onClick={() => addFloor("above")} title="Add an empty floor on top">
+                  + Floor above
+                </Btn>
+                <Btn onClick={() => addFloor("below")} title="Add a basement below the lowest floor">
+                  + Basement
+                </Btn>
+                <Btn onClick={() => addFloor("above", true)} title="Add a floor on top with a copy of this floor's walls, doors and windows">
+                  Copy this floor up
+                </Btn>
+              </div>
+              <Row label="Name">
+                <TextInput value={currentFloor.name} onCommit={(name) => updateFloor({ name: name.trim() || currentFloor.name })} />
+              </Row>
+              <Row label="Floor level">
+                <NumInput value={currentFloor.level} suffix="mm" onCommit={(level) => updateFloor({ level })} />
+              </Row>
+              <Row label="Floor-to-floor height">
+                <NumInput value={currentFloor.height} min={500} suffix="mm" onCommit={(height) => updateFloor({ height })} />
+              </Row>
+              <Toggle label="Show the floor below faintly" checked={settings.ghost} onChange={(ghost) => setSettings({ ghost })} />
+              <Btn onClick={deleteFloor} disabled={floors.length < 2} danger>
+                Delete this floor
+              </Btn>
+            </Section>
+
+            {selectedMany.length > 0 && (
+              <Section title="Layer of selection">
+                <Select
+                  value={
+                    selectedMany.every((e) => layerOf(e) === layerOf(selectedMany[0]))
+                      ? layerOf(selectedMany[0])
+                      : ""
+                  }
+                  options={[
+                    ...(selectedMany.every((e) => layerOf(e) === layerOf(selectedMany[0]))
+                      ? []
+                      : [{ id: "", name: "(mixed)" }]),
+                    ...allLayers.filter((layer) => !["site", "marks", "underlay"].includes(layer.id)),
+                  ]}
+                  onChange={(layer) => layer && assignLayer(layer)}
+                />
+              </Section>
+            )}
+
             {selected && selectionPanel(selected)}
 
             {selectedIds.length > 1 && (
@@ -2081,11 +2320,19 @@ export default function PlanStudio() {
                     </button>
                   ))}
                   <div className="flex justify-between border-t border-[#3a3e45] px-1 pt-1.5 font-semibold text-white">
-                    <span>Total</span>
+                    <span>This floor</span>
                     <span>
                       {formatArea(totalArea)} · {formatAreaFeet(totalArea)}
                     </span>
                   </div>
+                  {floors.length > 1 && (
+                    <div className="flex justify-between px-1 text-[#b4b8c0]">
+                      <span>All floors</span>
+                      <span>
+                        {formatArea(buildingArea)} · {formatAreaFeet(buildingArea)}
+                      </span>
+                    </div>
+                  )}
                 </>
               )}
             </Section>
@@ -2171,20 +2418,85 @@ export default function PlanStudio() {
             </Section>
 
             <Section title="Layers">
-              {LAYERS.map((layer) => (
-                <Toggle
-                  key={layer.id}
-                  label={layer.name}
-                  checked={!settings.hidden.includes(layer.id)}
-                  onChange={(on) =>
-                    setSettings({
-                      hidden: on
-                        ? settings.hidden.filter((id) => id !== layer.id)
-                        : [...settings.hidden, layer.id],
-                    })
-                  }
-                />
-              ))}
+              <p className="text-[#8b9099]">
+                Tick to show. Lock a layer to protect it from changes. Line weight is the printed pen
+                thickness.
+              </p>
+              {allLayers.map((layer) => {
+                const look = settings.layerLooks?.[layer.id] ?? {};
+                const custom = layer.id.startsWith("c-");
+                return (
+                  <div key={layer.id} className="rounded border border-[#2f3237] p-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <Toggle
+                        label={layer.name}
+                        checked={!settings.hidden.includes(layer.id)}
+                        onChange={(on) =>
+                          setSettings({
+                            hidden: on
+                              ? settings.hidden.filter((id) => id !== layer.id)
+                              : [...settings.hidden, layer.id],
+                          })
+                        }
+                      />
+                      <Btn
+                        active={look.locked === true}
+                        onClick={() => setLayerLook(layer.id, { locked: !look.locked })}
+                        title="Locked layers cannot be selected or moved"
+                      >
+                        {look.locked ? "Locked" : "Lock"}
+                      </Btn>
+                    </div>
+                    {!["underlay", "rooms", "marks"].includes(layer.id) && (
+                      <div className="mt-1.5 flex items-center gap-1.5">
+                        <Select
+                          value={look.weight ? String(look.weight) : ""}
+                          options={[
+                            { id: "", name: "Weight: by style" },
+                            ...LINE_WEIGHTS.map((w) => ({ id: String(w), name: `${w.toFixed(2)} mm` })),
+                          ]}
+                          onChange={(value) => setLayerLook(layer.id, { weight: value ? Number(value) : undefined })}
+                        />
+                        <input
+                          type="color"
+                          value={look.color || "#888888"}
+                          onChange={(event) => setLayerLook(layer.id, { color: event.target.value })}
+                          aria-label={`${layer.name} colour`}
+                          title="Line colour"
+                          className="h-7 w-8 shrink-0 cursor-pointer rounded border border-[#3a3e45] bg-transparent"
+                        />
+                        <Btn onClick={() => setLayerLook(layer.id, { color: undefined })} disabled={!look.color} title="Use the render style's colour">
+                          Reset
+                        </Btn>
+                        {custom && (
+                          <Btn
+                            danger
+                            title="Remove this layer; its objects go back to their usual layers"
+                            onClick={() => {
+                              saveFull({
+                                ...full,
+                                entities: full.entities.map((e) => {
+                                  if (e.layer !== layer.id) return e;
+                                  const next = { ...e };
+                                  delete next.layer;
+                                  return next;
+                                }),
+                                settings: {
+                                  ...settings,
+                                  customLayers: (settings.customLayers ?? []).filter((item) => item.id !== layer.id),
+                                },
+                              });
+                            }}
+                          >
+                            ✕
+                          </Btn>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              <Btn onClick={addLayer}>+ New layer</Btn>
             </Section>
           </aside>
         }

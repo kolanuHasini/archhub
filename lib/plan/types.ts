@@ -104,7 +104,9 @@ export type Underlay = {
   opacity: number; // 0 to 1
 };
 
-export type Entity =
+// Every object also remembers which floor it is on and, optionally, a layer
+// it has been moved to (otherwise it sits on the usual layer for its kind).
+export type Entity = (
   | Wall
   | Opening
   | Dim
@@ -115,7 +117,34 @@ export type Entity =
   | Line
   | Circle
   | Arc
-  | Underlay;
+  | Underlay
+) & { floor?: string; layer?: string };
+
+// One storey of the building. Levels and heights are in millimetres; a
+// basement simply has a level below zero.
+export type Floor = {
+  id: string;
+  name: string;
+  level: number; // height of this floor above the ground floor
+  height: number; // floor-to-floor height
+};
+
+export const GROUND_FLOOR: Floor = {
+  id: "g",
+  name: "Ground floor",
+  level: 0,
+  height: 3000,
+};
+
+// How one layer is drawn. Anything left out follows the render style.
+export type LayerLook = {
+  weight?: number; // line weight in millimetres, as on a printed drawing
+  color?: string;
+  locked?: boolean; // locked layers cannot be selected or moved
+};
+
+// Standard technical-pen line weights, in millimetres.
+export const LINE_WEIGHTS = [0.13, 0.18, 0.25, 0.35, 0.5, 0.7, 1.0];
 
 // The plot of land. Its top-left corner is at 0,0 and the road is along the
 // bottom edge. `north` is the direction of north on screen, in degrees
@@ -138,9 +167,13 @@ export type Settings = {
   wallT: number; // thickness for new walls
   wallH: number; // height for new walls
   hidden: string[]; // layers switched off
+  layerLooks: Record<string, LayerLook>; // line weight, colour and lock per layer
+  customLayers: { id: string; name: string }[]; // layers you have added
+  ghost: boolean; // show the floor below faintly, for lining walls up
 };
 
 export type PlanDoc = {
+  floors?: Floor[];
   entities: Entity[];
   site: Site | null;
   settings: Settings;
@@ -160,6 +193,9 @@ export const DEFAULT_SETTINGS: Settings = {
   wallT: 230,
   wallH: 3000,
   hidden: [],
+  layerLooks: {},
+  customLayers: [],
+  ghost: true,
 };
 
 export const EMPTY_PLAN: PlanDoc = {
@@ -183,6 +219,7 @@ export const LAYERS: { id: string; name: string }[] = [
 ];
 
 export function layerOf(entity: Entity): string {
+  if (entity.layer) return entity.layer;
   switch (entity.kind) {
     case "wall":
       return "walls";
@@ -252,7 +289,7 @@ export const FLOOR_FINISHES = [
 ];
 
 export const WALL_THICKNESSES = [115, 150, 230, 300];
-export const SCALES = [50, 100, 200, 500];
+export const SCALES = [50, 100, 200, 500, 1000];
 
 export function newId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);

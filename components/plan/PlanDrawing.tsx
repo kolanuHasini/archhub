@@ -1,3 +1,4 @@
+import { memo } from "react";
 import { getFurniture, type Part } from "@/lib/plan/furniture";
 import {
   add,
@@ -20,6 +21,7 @@ import {
   wallPointAt,
 } from "@/lib/plan/geometry";
 import { FINISH_COLOURS, getStyle, type PlanStyle } from "@/lib/plan/styles";
+import { layerOf } from "@/lib/plan/types";
 import type {
   Arc,
   Circle,
@@ -172,7 +174,7 @@ function RoomView({
         strokeDasharray="5 4"
         pointerEvents="none"
       />
-      <g data-id={room.id} fontFamily={FONT} fill={style.text} textAnchor="middle">
+      <g data-id={room.id} data-layer={layerOf(room)} fontFamily={FONT} fill={style.text} textAnchor="middle">
         <text x={cx} y={cy - letter * 0.2} fontSize={letter * 1.15} fontWeight="bold">
           {room.name}
         </text>
@@ -203,7 +205,7 @@ function FurnView({ furn, style }: { furn: Furn; style: PlanStyle }) {
   const item = getFurniture(furn.item);
   return (
     <g
-      data-id={furn.id}
+      data-id={furn.id} data-layer={layerOf(furn)}
       transform={`translate(${furn.p[0]} ${furn.p[1]}) rotate(${furn.rot}) translate(${-item.w / 2} ${-item.d / 2})`}
       fill={style.furnitureFill}
       stroke={style.furnitureLine}
@@ -323,7 +325,7 @@ function TreeView({ tree, style }: { tree: Tree; style: PlanStyle }) {
   }
 
   return (
-    <g data-id={tree.id} fill="none" stroke={style.treeLine} strokeWidth="1">
+    <g data-id={tree.id} data-layer={layerOf(tree)} fill="none" stroke={style.treeLine} strokeWidth="1">
       <circle cx={x} cy={y} r={r} fill="transparent" stroke="none" />
       {parts}
     </g>
@@ -475,7 +477,7 @@ function OpeningView({
 
   return (
     <g
-      data-id={opening.id}
+      data-id={opening.id} data-layer={layerOf(opening)}
       transform={`translate(${centre[0]} ${centre[1]}) rotate(${spot.angle})`}
     >
       {/* Cut the gap out of the wall (a little deeper on a curved wall). */}
@@ -484,6 +486,7 @@ function OpeningView({
         y={wall.m ? -t * 0.62 : -t / 2}
         width={w}
         height={wall.m ? t * 1.24 : t}
+        data-keep="1"
         fill={style.paper}
         stroke={style.paper}
         strokeWidth={style.wallLineWidth * 2 + 1}
@@ -508,6 +511,7 @@ export function DimView({
   b,
   offset,
   id,
+  layer,
   style,
   letter,
   unitName,
@@ -516,6 +520,7 @@ export function DimView({
   b: Pt;
   offset: number;
   id?: string;
+  layer?: string;
   style: PlanStyle;
   letter: number;
   unitName: Unit;
@@ -535,7 +540,7 @@ export function DimView({
     <line key={key} x1={p[0]} y1={p[1]} x2={q[0]} y2={q[1]} strokeWidth={width} />
   );
   return (
-    <g data-id={id} stroke={style.dimLine} fill="none">
+    <g data-id={id} data-layer={layer ?? "dims"} stroke={style.dimLine} fill="none">
       {id && (
         <line
           x1={a2[0]}
@@ -619,7 +624,7 @@ function SheetMarks({
 
 // --- The whole drawing -------------------------------------------------------------
 
-export default function PlanDrawing({
+function PlanDrawing({
   doc,
   activeId = null,
 }: {
@@ -632,16 +637,38 @@ export default function PlanDrawing({
     ? { ...base, wallFill: settings.wallColor, wallLine: settings.wallColor }
     : base;
   const letter = 2.5 * settings.scale; // 2.5 mm tall lettering on paper
-  const show = (layer: string) => !settings.hidden.includes(layer);
+  // Objects on a hidden layer are left out altogether.
+  const visible = doc.entities.filter((e) => !settings.hidden.includes(layerOf(e)));
+  const show = (layer: string) =>
+    layer === "site" || layer === "marks" ? !settings.hidden.includes(layer) : true;
+
+  // Per-layer line weight and colour, written as CSS so it applies to every
+  // object on that layer. 0.25 mm on paper is drawn 1 pixel wide.
+  const layerCss = Object.entries(settings.layerLooks ?? {})
+    .map(([id, look]) => {
+      const lines = `[data-layer="${id}"]:not(g):not(text):not(image):not([data-wall]):not([stroke="none"]):not([stroke="transparent"]), [data-layer="${id}"] *:not(text):not([stroke="none"]):not([stroke="transparent"]):not([data-keep])`;
+      let css = "";
+      if (look.weight) {
+        css += `${lines}{stroke-width:${look.weight * 4}px}`;
+        css += `[data-layer="${id}"][data-wall]{stroke-width:${look.weight * 8}px}`;
+      }
+      if (look.color && /^#[0-9a-fA-F]{6}$/.test(look.color)) {
+        css += `${lines}{stroke:${look.color}}`;
+        css += `[data-layer="${id}"][data-wall]{stroke:${look.color}}`;
+        css += `text[data-layer="${id}"], [data-layer="${id}"] text{fill:${look.color}}`;
+      }
+      return css;
+    })
+    .join("");
 
   const of = <K extends string>(kind: K) =>
-    doc.entities.filter((e) => e.kind === kind) as Extract<
+    visible.filter((e) => e.kind === kind) as Extract<
       PlanDoc["entities"][number],
       { kind: K }
     >[];
   const walls = of("wall") as Wall[];
   const rooms = of("room") as Room[];
-  const openings = doc.entities.filter(
+  const openings = visible.filter(
     (e): e is Opening => e.kind === "door" || e.kind === "window",
   );
   const outlines = walls.map((wall) => ({ wall, d: wallOutline(wall, walls) }));
@@ -653,6 +680,7 @@ export default function PlanDrawing({
       <defs>
         <FinishPatterns style={style} />
       </defs>
+      {layerCss && <style>{layerCss}</style>}
 
       {/* Traced pictures sit at the very back. They can only be clicked while
           selected, so they never get in the way of drawing. */}
@@ -660,7 +688,7 @@ export default function PlanDrawing({
         (of("image") as Underlay[]).map((image) => (
           <image
             key={image.id}
-            data-id={image.id}
+            data-id={image.id} data-layer={layerOf(image)}
             href={image.href}
             x={image.p[0]}
             y={image.p[1]}
@@ -737,7 +765,7 @@ export default function PlanDrawing({
 
       {show("lines") &&
         (of("line") as Line[]).map((line) => (
-          <g key={line.id} data-id={line.id}>
+          <g key={line.id} data-id={line.id} data-layer={layerOf(line)}>
             <line
               x1={line.a[0]}
               y1={line.a[1]}
@@ -760,7 +788,7 @@ export default function PlanDrawing({
       {show("lines") && (
         <g fill="none">
           {(of("circle") as Circle[]).map((circle) => (
-            <g key={circle.id} data-id={circle.id}>
+            <g key={circle.id} data-id={circle.id} data-layer={layerOf(circle)}>
               <circle cx={circle.c[0]} cy={circle.c[1]} r={circle.r} stroke="transparent" strokeWidth="12" />
               <circle cx={circle.c[0]} cy={circle.c[1]} r={circle.r} stroke={style.ink} strokeWidth="1.1" />
             </g>
@@ -768,7 +796,7 @@ export default function PlanDrawing({
           {(of("arc") as Arc[]).map((arc) => {
             const d = arcPath(arc.a, arc.m, arc.b);
             return (
-              <g key={arc.id} data-id={arc.id}>
+              <g key={arc.id} data-id={arc.id} data-layer={layerOf(arc)}>
                 <path d={d} stroke="transparent" strokeWidth="12" />
                 <path d={d} stroke={style.ink} strokeWidth="1.1" />
               </g>
@@ -784,7 +812,8 @@ export default function PlanDrawing({
           {outlines.map(({ wall, d }) => (
             <path
               key={wall.id}
-              data-id={wall.id}
+              data-id={wall.id} data-layer={layerOf(wall)}
+              data-wall="1"
               d={d}
               fill={style.wallFill}
               stroke={style.wallLine}
@@ -805,7 +834,7 @@ export default function PlanDrawing({
             />
           ))}
           {outlines.map(({ wall, d }) => (
-            <path key={wall.id} data-id={wall.id} d={d} fill={style.wallFill} stroke="none" />
+            <path key={wall.id} data-id={wall.id} data-layer={layerOf(wall)} d={d} fill={style.wallFill} stroke="none" />
           ))}
           {joints.map((joint, index) => (
             <circle
@@ -840,6 +869,7 @@ export default function PlanDrawing({
             <DimView
               key={dim.id}
               id={dim.id}
+              layer={layerOf(dim)}
               a={dim.a}
               b={dim.b}
               offset={dim.offset}
@@ -867,7 +897,7 @@ export default function PlanDrawing({
         (of("text") as Label[]).map((label) => {
           const size = letter * label.size;
           return (
-            <g key={label.id} data-id={label.id}>
+            <g key={label.id} data-id={label.id} data-layer={layerOf(label)}>
               {label.level && (
                 // A level mark: a small target showing where the height applies.
                 <g stroke={style.ink} strokeWidth="1.2" fill="none">
@@ -898,3 +928,7 @@ export default function PlanDrawing({
     </g>
   );
 }
+
+// Redrawn only when the plan itself changes, so large buildings stay smooth
+// while the pointer moves.
+export default memo(PlanDrawing);
