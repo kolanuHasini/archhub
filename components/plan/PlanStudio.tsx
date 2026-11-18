@@ -73,6 +73,7 @@ import {
   type Wall,
 } from "@/lib/plan/types";
 import { loadPhoto } from "@/lib/image";
+import { projectKey, useProjects } from "@/lib/projects";
 import { isSavedInBrowser, useSavedState } from "@/lib/useSavedState";
 
 // ---------------------------------------------------------------------------
@@ -222,7 +223,10 @@ function buildExportSvg(svg: SVGSVGElement, doc: PlanDoc) {
 }
 
 export default function PlanStudio() {
-  const [saved, saveDoc] = useSavedState(STORAGE_KEY, EMPTY_PLAN);
+  // Each project keeps its own drawing.
+  const { active: project } = useProjects();
+  const storageKey = projectKey(STORAGE_KEY, project.id);
+  const [saved, saveDoc] = useSavedState(storageKey, EMPTY_PLAN);
   // `full` is the whole building (every floor). `doc` is just the floor being
   // worked on, which is what all the drawing tools see.
   const full: PlanDoc = useMemo(() => normalizePlan(saved), [saved]);
@@ -1025,7 +1029,7 @@ export default function PlanStudio() {
       setSelectedId(image.id);
       setView(null);
       setNotice(
-        isSavedInBrowser(STORAGE_KEY)
+        isSavedInBrowser(storageKey)
           ? "Picture added. Set its real width on the right so it is at true scale."
           : "Picture added, but the browser's saving space is full. Use Save to keep your work.",
       );
@@ -1156,7 +1160,7 @@ export default function PlanStudio() {
     let depth = 0;
     let facing = "";
     try {
-      const stored = JSON.parse(window.localStorage.getItem(PLANNER_KEY) ?? "{}");
+      const stored = JSON.parse(window.localStorage.getItem(projectKey(PLANNER_KEY, project.id)) ?? "{}");
       width = Number(String(stored.siteWidth ?? "").replace(",", ".")) * 1000;
       depth = Number(String(stored.siteDepth ?? "").replace(",", ".")) * 1000;
       facing = String(stored.facing ?? "");
@@ -1725,11 +1729,11 @@ export default function PlanStudio() {
     <div className="fixed inset-0 z-50 flex flex-col bg-[#17181b] font-sans text-[12px] text-[#d7d9de]">
       {/* Top bar */}
       <header className={`${bar} h-11 shrink-0 overflow-x-auto border-b px-2`}>
-        <Link href="/" className="mr-1 shrink-0 font-mono text-[13px] font-semibold text-white">
+        <Link href="/dashboard" className="mr-1 shrink-0 font-mono text-[13px] font-semibold text-white">
           ← Arch<span className="text-[#4c8dff]">Hub</span>
         </Link>
         <span className="mr-2 shrink-0 border-l border-[#3a3e45] pl-3 text-[13px] text-[#b4b8c0]">
-          Floor Plan Studio
+          {project.name} · Floor Plan Studio
         </span>
         <select
           value={currentFloor.id}

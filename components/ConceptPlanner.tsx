@@ -16,6 +16,7 @@ import SiteStudy, {
 } from "@/components/SiteStudy";
 import SketchPad, { EMPTY_SKETCH, type Sketch } from "@/components/SketchPad";
 import { downloadBlob, safeFileName } from "@/lib/download";
+import { projectKey, useProjects } from "@/lib/projects";
 import { useSavedState } from "@/lib/useSavedState";
 
 type Climate = { id: string; label: string; strategies: string[] };
@@ -303,9 +304,15 @@ export default function ConceptPlanner({
   drivers: Driver[];
   siteOptions: SiteOptions;
 }) {
-  const [plan, savePlan, resetPlan] = useSavedState(STORAGE_KEY, EMPTY_PLAN);
+  // Each project keeps its own concept and sketch.
+  const { active: project } = useProjects();
+  const sketchKey = projectKey(SKETCH_KEY, project.id);
+  const [plan, savePlan, resetPlan] = useSavedState(
+    projectKey(STORAGE_KEY, project.id),
+    EMPTY_PLAN,
+  );
   const [sketch, saveSketch, resetSketch] = useSavedState(
-    SKETCH_KEY,
+    sketchKey,
     EMPTY_SKETCH,
   );
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -731,7 +738,7 @@ export default function ConceptPlanner({
         done={stepsDone[4]}
       >
         <SketchPad
-          storageKey={SKETCH_KEY}
+          storageKey={sketchKey}
           fileName={`concept-sketch-${safeFileName(plan.name)}`}
         />
       </Step>

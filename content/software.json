@@ -1,0 +1,408 @@
+[
+  {
+    "id": "autocad",
+    "name": "AutoCAD",
+    "maker": "Autodesk",
+    "group": "Drafting and BIM",
+    "summary": "The standard for precise 2D drafting: plans, sections, elevations and details.",
+    "bestFor": ["Working drawings", "Site plans", "Detail drawings", "Exchanging DWG/DXF files"],
+    "shortcuts": [
+      { "keys": "L", "action": "Line" },
+      { "keys": "PL", "action": "Polyline" },
+      { "keys": "REC", "action": "Rectangle" },
+      { "keys": "C", "action": "Circle" },
+      { "keys": "O", "action": "Offset" },
+      { "keys": "TR", "action": "Trim" },
+      { "keys": "EX", "action": "Extend" },
+      { "keys": "M / CO", "action": "Move / Copy" },
+      { "keys": "RO / MI", "action": "Rotate / Mirror" },
+      { "keys": "F", "action": "Fillet" },
+      { "keys": "H", "action": "Hatch" },
+      { "keys": "DLI", "action": "Linear dimension" },
+      { "keys": "LA", "action": "Layer manager" },
+      { "keys": "Z then E", "action": "Zoom to everything" },
+      { "keys": "F3 / F8", "action": "Object snap / Ortho on and off" }
+    ],
+    "tips": [
+      "Draw at real size (1:1) in model space and set the scale in the layout, never by shrinking the drawing.",
+      "Keep one layer per kind of object: walls, doors, dimensions, text. It makes line weights and printing easy.",
+      "Type commands with the left hand and keep the right hand on the mouse; it is far faster than the ribbon."
+    ],
+    "withArchHub": "Export a floor from the Floor Plan Studio as DXF and open it in AutoCAD, or use Save As > DXF to bring an AutoCAD drawing in.",
+    "site": "https://www.autodesk.com/products/autocad/overview"
+  },
+  {
+    "id": "revit",
+    "name": "Revit",
+    "maker": "Autodesk",
+    "group": "Drafting and BIM",
+    "summary": "Building information modelling: one 3D model that produces plans, sections, schedules and quantities.",
+    "bestFor": ["Coordinated drawing sets", "Schedules and quantities", "Working with consultants", "Large projects"],
+    "shortcuts": [
+      { "keys": "WA", "action": "Wall" },
+      { "keys": "DR / WN", "action": "Door / Window" },
+      { "keys": "CM", "action": "Place a component" },
+      { "keys": "RM", "action": "Room" },
+      { "keys": "GR / LL", "action": "Grid / Level" },
+      { "keys": "DI", "action": "Aligned dimension" },
+      { "keys": "AL", "action": "Align" },
+      { "keys": "MV / CO", "action": "Move / Copy" },
+      { "keys": "RO / MM", "action": "Rotate / Mirror" },
+      { "keys": "TR", "action": "Trim or extend to corner" },
+      { "keys": "OF", "action": "Offset" },
+      { "keys": "VG", "action": "Visibility and graphics" },
+      { "keys": "TL", "action": "Thin lines on and off" },
+      { "keys": "ZF", "action": "Zoom to fit" },
+      { "keys": "WT", "action": "Tile open views" }
+    ],
+    "tips": [
+      "Set up levels and grids before drawing a single wall; everything else hangs off them.",
+      "Model it once, then let views show it: never redraw the same wall in a section.",
+      "Use view templates so every plan in the set has the same line weights and visibility."
+    ],
+    "withArchHub": "Sketch the plan and test options quickly in the Floor Plan Studio, export DXF, and link it into Revit as an underlay to model over.",
+    "site": "https://www.autodesk.com/products/revit/overview"
+  },
+  {
+    "id": "rayon",
+    "name": "Rayon",
+    "maker": "Rayon",
+    "group": "Drafting and BIM",
+    "summary": "A browser-based 2D drawing tool for quick, good-looking plans and space planning.",
+    "bestFor": ["Fast presentation plans", "Space planning", "Sharing a plan by link"],
+    "shortcuts": [],
+    "tips": [
+      "Import a DXF or PDF as a background and trace over it to restyle an existing plan.",
+      "Use its styles to switch a plan between technical and presentation looks."
+    ],
+    "withArchHub": "Both work in the browser; exchange drawings between them with DXF.",
+    "site": "https://www.rayon.design"
+  },
+  {
+    "id": "sketchup",
+    "name": "SketchUp",
+    "maker": "Trimble",
+    "group": "3D modelling",
+    "summary": "Fast, intuitive 3D modelling by pushing and pulling surfaces. Ideal for early massing.",
+    "bestFor": ["Concept massing", "Quick 3D studies", "Interior layouts", "A base model for rendering"],
+    "shortcuts": [
+      { "keys": "Space", "action": "Select" },
+      { "keys": "L", "action": "Line" },
+      { "keys": "R", "action": "Rectangle" },
+      { "keys": "C / A", "action": "Circle / Arc" },
+      { "keys": "P", "action": "Push/Pull" },
+      { "keys": "M", "action": "Move (tap Ctrl to copy)" },
+      { "keys": "Q", "action": "Rotate" },
+      { "keys": "S", "action": "Scale" },
+      { "keys": "F", "action": "Offset" },
+      { "keys": "T", "action": "Tape measure" },
+      { "keys": "E", "action": "Eraser" },
+      { "keys": "B", "action": "Paint bucket" },
+      { "keys": "G", "action": "Make component" },
+      { "keys": "O / H", "action": "Orbit / Pan" }
+    ],
+    "tips": [
+      "Make a group or component of every object as soon as you draw it, so shapes do not stick together.",
+      "Type a number straight after starting a move or a push/pull to set an exact distance.",
+      "Use scenes to save camera views you will want again for renders."
+    ],
+    "withArchHub": "Import a DXF floor plan from the studio and push/pull the walls up to the height you set.",
+    "site": "https://www.sketchup.com"
+  },
+  {
+    "id": "rhino",
+    "name": "Rhino",
+    "maker": "Robert McNeel & Associates",
+    "group": "3D modelling",
+    "summary": "Precise free-form modelling with curves and surfaces; with Grasshopper, parametric design.",
+    "bestFor": ["Curved and complex forms", "Facade studies", "Parametric design", "Digital fabrication"],
+    "shortcuts": [
+      { "keys": "F3", "action": "Properties" },
+      { "keys": "F8 / F9", "action": "Ortho / Grid snap on and off" },
+      { "keys": "F10 / F11", "action": "Control points on / off" },
+      { "keys": "Ctrl + G", "action": "Group" },
+      { "keys": "Ctrl + J", "action": "Join" },
+      { "keys": "Ctrl + T", "action": "Trim" },
+      { "keys": "Ctrl + Shift + S", "action": "Split" },
+      { "keys": "Ctrl + M", "action": "Maximise the viewport" },
+      { "keys": "Ctrl + A", "action": "Select all" }
+    ],
+    "tips": [
+      "Rhino is command-driven: start typing a command name (Line, Loft, Sweep1, ExtrudeCrv) and press Enter.",
+      "Build clean curves first. A good surface comes from few, well-placed control points.",
+      "Keep geometry on named layers from the start; it pays off when exporting or rendering."
+    ],
+    "withArchHub": "The studio's DXF export keeps curved walls as true arcs, so they arrive in Rhino as clean curves.",
+    "site": "https://www.rhino3d.com"
+  },
+  {
+    "id": "blender",
+    "name": "Blender",
+    "maker": "Blender Foundation",
+    "group": "3D modelling",
+    "summary": "A free, open-source 3D suite for modelling, rendering and animation.",
+    "bestFor": ["Free high-quality rendering", "Organic forms", "Animation and walkthroughs"],
+    "shortcuts": [
+      { "keys": "G / R / S", "action": "Move / Rotate / Scale" },
+      { "keys": "Tab", "action": "Switch between Object and Edit mode" },
+      { "keys": "E", "action": "Extrude" },
+      { "keys": "Ctrl + R", "action": "Loop cut" },
+      { "keys": "Shift + A", "action": "Add an object" },
+      { "keys": "Shift + D", "action": "Duplicate" },
+      { "keys": "X", "action": "Delete" },
+      { "keys": "H", "action": "Hide" },
+      { "keys": "N", "action": "Side panel" },
+      { "keys": "Z", "action": "Shading menu" },
+      { "keys": "Numpad 1 / 3 / 7", "action": "Front / Side / Top view" },
+      { "keys": "Numpad 0", "action": "Camera view" },
+      { "keys": "F12", "action": "Render" }
+    ],
+    "tips": [
+      "After G, R or S, press X, Y or Z to lock to an axis, then type a number for an exact amount.",
+      "Set the unit system to metric and work at real size so lighting behaves correctly."
+    ],
+    "withArchHub": "Blender can import DXF with its built-in add-on, so studio plans can be the base for a model.",
+    "site": "https://www.blender.org"
+  },
+  {
+    "id": "d5-render",
+    "name": "D5 Render",
+    "maker": "Dimension 5",
+    "group": "Rendering",
+    "summary": "Real-time ray-traced rendering with a large asset library, linked live to your modelling software.",
+    "bestFor": ["Fast photoreal stills", "Animations", "Live sync with SketchUp, Rhino and Revit"],
+    "shortcuts": [
+      { "keys": "W A S D", "action": "Move through the scene" },
+      { "keys": "Q / E", "action": "Move down or up" },
+      { "keys": "Right mouse", "action": "Look around" }
+    ],
+    "tips": [
+      "Get the sun angle and one or two key materials right before adding any assets.",
+      "Use the live-sync plugin so model changes update without re-importing.",
+      "Add people and plants last, and sparingly: they should support the architecture, not hide it."
+    ],
+    "withArchHub": "Plan and test layouts in the studio first; render the 3D model you build from them in D5.",
+    "site": "https://www.d5render.com"
+  },
+  {
+    "id": "lumion",
+    "name": "Lumion",
+    "maker": "Act-3D",
+    "group": "Rendering",
+    "summary": "Rendering focused on landscapes and atmosphere, with big libraries of plants and effects.",
+    "bestFor": ["Landscape and exterior scenes", "Walkthrough videos", "Atmospheric presentation images"],
+    "shortcuts": [
+      { "keys": "W A S D", "action": "Move through the scene" },
+      { "keys": "Q / E", "action": "Move up or down" },
+      { "keys": "Shift", "action": "Hold to move faster" }
+    ],
+    "tips": [
+      "Start from one of the built-in styles, then turn effects down rather than up.",
+      "Use LiveSync with your modelling software to see changes immediately."
+    ],
+    "withArchHub": "Use the site study and plan from ArchHub to decide the views worth rendering.",
+    "site": "https://lumion.com"
+  },
+  {
+    "id": "enscape",
+    "name": "Enscape",
+    "maker": "Chaos",
+    "group": "Rendering",
+    "summary": "A real-time renderer that runs inside Revit, SketchUp, Rhino and Archicad.",
+    "bestFor": ["Checking a design while modelling", "Quick client walkthroughs", "VR"],
+    "shortcuts": [
+      { "keys": "W A S D", "action": "Move through the scene" },
+      { "keys": "E / Q", "action": "Move up or down" },
+      { "keys": "Shift / Ctrl", "action": "Hold to move faster" }
+    ],
+    "tips": [
+      "Because it renders the live model, fix problems in the model, not in the render.",
+      "Save views in your modelling software so you can return to the same camera."
+    ],
+    "withArchHub": "Enscape works from your Revit, SketchUp or Rhino model built from the studio's plans.",
+    "site": "https://www.chaos.com/enscape"
+  },
+  {
+    "id": "twinmotion",
+    "name": "Twinmotion",
+    "maker": "Epic Games",
+    "group": "Rendering",
+    "summary": "Real-time visualisation built on Unreal Engine, with seasons, weather and animated context.",
+    "bestFor": ["Large sites and urban scenes", "Phasing and seasonal views", "Free for students"],
+    "shortcuts": [
+      { "keys": "W A S D", "action": "Move through the scene" },
+      { "keys": "Q / E", "action": "Move down or up" },
+      { "keys": "Right mouse", "action": "Look around" }
+    ],
+    "tips": [
+      "Use the weather and season sliders to test how the design reads through the year.",
+      "Direct Link keeps the scene in step with your modelling software."
+    ],
+    "withArchHub": "Good for showing a whole site: bring the site dimensions and north from the site study.",
+    "site": "https://www.twinmotion.com"
+  },
+  {
+    "id": "photoshop",
+    "name": "Photoshop",
+    "maker": "Adobe",
+    "group": "Presentation",
+    "summary": "Image editing for post-production of renders, collage elevations and textured plans.",
+    "bestFor": ["Render post-production", "Collage and elevation rendering", "Adding people, trees and sky"],
+    "shortcuts": [
+      { "keys": "V", "action": "Move" },
+      { "keys": "M / L", "action": "Marquee / Lasso selection" },
+      { "keys": "W", "action": "Quick selection or magic wand" },
+      { "keys": "C", "action": "Crop" },
+      { "keys": "B / E", "action": "Brush / Eraser" },
+      { "keys": "S", "action": "Clone stamp" },
+      { "keys": "G", "action": "Gradient or paint bucket" },
+      { "keys": "T", "action": "Type" },
+      { "keys": "[ and ]", "action": "Brush smaller / larger" },
+      { "keys": "Ctrl + J", "action": "Duplicate layer" },
+      { "keys": "Ctrl + T", "action": "Free transform" },
+      { "keys": "Ctrl + Shift + N", "action": "New layer" },
+      { "keys": "X / D", "action": "Swap / reset colours" }
+    ],
+    "tips": [
+      "Work with masks and adjustment layers instead of erasing, so every change can be undone later.",
+      "Set layers of textures to Multiply over a line drawing to colour a plan or elevation.",
+      "Match the light direction of every cut-out person and tree to the sun in the render."
+    ],
+    "withArchHub": "Export a plan as PNG from the studio (try the presentation styles) and finish it in Photoshop.",
+    "site": "https://www.adobe.com/products/photoshop.html"
+  },
+  {
+    "id": "illustrator",
+    "name": "Illustrator",
+    "maker": "Adobe",
+    "group": "Presentation",
+    "summary": "Vector drawing for diagrams, line weights and crisp graphics at any size.",
+    "bestFor": ["Concept and site diagrams", "Cleaning up line drawings", "Icons and maps"],
+    "shortcuts": [
+      { "keys": "V / A", "action": "Selection / Direct selection" },
+      { "keys": "P", "action": "Pen" },
+      { "keys": "T", "action": "Type" },
+      { "keys": "M / L", "action": "Rectangle / Ellipse" },
+      { "keys": "\\", "action": "Line" },
+      { "keys": "I", "action": "Eyedropper" },
+      { "keys": "Shift + M", "action": "Shape builder" },
+      { "keys": "Ctrl + G", "action": "Group" },
+      { "keys": "Ctrl + J", "action": "Join paths" },
+      { "keys": "Ctrl + 7", "action": "Make a clipping mask" },
+      { "keys": "Ctrl + 2", "action": "Lock selection" },
+      { "keys": "Ctrl + Shift + O", "action": "Turn text into outlines" }
+    ],
+    "tips": [
+      "Give diagrams only two or three line weights and one accent colour.",
+      "Use Select > Same > Stroke weight to restyle every line of one kind at once."
+    ],
+    "withArchHub": "The studio exports SVG, which opens in Illustrator as editable vector lines.",
+    "site": "https://www.adobe.com/products/illustrator.html"
+  },
+  {
+    "id": "indesign",
+    "name": "InDesign",
+    "maker": "Adobe",
+    "group": "Presentation",
+    "summary": "Page layout for portfolios, presentation sheets and reports.",
+    "bestFor": ["Portfolios", "Jury sheets", "Reports and booklets"],
+    "shortcuts": [
+      { "keys": "V / A", "action": "Selection / Direct selection" },
+      { "keys": "T", "action": "Type" },
+      { "keys": "F", "action": "Rectangle frame for images" },
+      { "keys": "W", "action": "Preview without guides" },
+      { "keys": "Ctrl + D", "action": "Place an image or text" },
+      { "keys": "Ctrl + E", "action": "Export" },
+      { "keys": "Ctrl + Alt + Shift + C", "action": "Fill frame with image, in proportion" },
+      { "keys": "Ctrl + Alt + Shift + E", "action": "Fit image inside frame, in proportion" },
+      { "keys": "Shift + W", "action": "Presentation mode" }
+    ],
+    "tips": [
+      "Set up a column grid and margins on the parent page before placing anything.",
+      "Use paragraph styles for headings and captions so the whole portfolio stays consistent.",
+      "Link images instead of pasting them, and package the file before sending it to print."
+    ],
+    "withArchHub": "Place PNG or SVG exports from the studio and the concept sketch straight into your sheets.",
+    "site": "https://www.adobe.com/products/indesign.html"
+  },
+  {
+    "id": "canva",
+    "name": "Canva",
+    "maker": "Canva",
+    "group": "Presentation",
+    "summary": "Quick browser-based layouts from templates: boards, slides and social posts.",
+    "bestFor": ["Fast presentation boards", "Slides", "Mood boards"],
+    "shortcuts": [
+      { "keys": "T", "action": "Add text" },
+      { "keys": "R / L / C", "action": "Rectangle / Line / Circle" },
+      { "keys": "Ctrl + D", "action": "Duplicate" },
+      { "keys": "Ctrl + G", "action": "Group" },
+      { "keys": "/", "action": "Search for elements and actions" }
+    ],
+    "tips": [
+      "Pick one template and strip it back; too many decorative elements weaken architectural work.",
+      "Export as PDF Print for boards that will be printed."
+    ],
+    "withArchHub": "Upload plan images and the concept sketch exported from ArchHub into your boards.",
+    "site": "https://www.canva.com"
+  },
+  {
+    "id": "midjourney",
+    "name": "Midjourney",
+    "maker": "Midjourney",
+    "group": "AI image tools",
+    "summary": "AI image generation from text, strong at mood, atmosphere and concept imagery.",
+    "bestFor": ["Mood and atmosphere images", "Exploring a concept quickly", "Material and light studies"],
+    "shortcuts": [
+      { "keys": "--ar 16:9", "action": "Set the picture's proportions" },
+      { "keys": "--style raw", "action": "Less stylised, more literal" },
+      { "keys": "--stylize 50", "action": "How artistic it is allowed to be (0 to 1000)" },
+      { "keys": "--chaos 20", "action": "How varied the four results are" },
+      { "keys": "--no cars", "action": "Leave something out" },
+      { "keys": "--seed 1234", "action": "Repeat a result you liked" }
+    ],
+    "tips": [
+      "Describe the building like a photograph: subject, material, light, weather, viewpoint, lens.",
+      "It invents architecture: use the images for mood and ideas, never as a record of your design."
+    ],
+    "withArchHub": "The Prompt Builder in AI Studio writes prompts in this format from simple choices.",
+    "site": "https://www.midjourney.com"
+  },
+  {
+    "id": "stable-diffusion",
+    "name": "Stable Diffusion",
+    "maker": "Stability AI",
+    "group": "AI image tools",
+    "summary": "Open AI image generation you can run yourself, and steer closely with your own drawings.",
+    "bestFor": ["Turning a line drawing or massing view into a render", "Free, local image generation", "Fine control"],
+    "shortcuts": [
+      { "keys": "Negative prompt", "action": "List what you do not want (blurry, distorted, text)" },
+      { "keys": "CFG scale 6 to 8", "action": "How strictly it follows your words" },
+      { "keys": "Steps 25 to 35", "action": "More steps means more refined, and slower" },
+      { "keys": "img2img", "action": "Start from your own image" },
+      { "keys": "ControlNet", "action": "Keep the lines or depth of your drawing exactly" }
+    ],
+    "tips": [
+      "With ControlNet, a clean line export of your elevation keeps the real proportions of your design.",
+      "Keep denoising strength low (0.3 to 0.5) to stay close to your original image."
+    ],
+    "withArchHub": "Export a plan or sketch as PNG from ArchHub and use it as the guiding image.",
+    "site": "https://stability.ai"
+  },
+  {
+    "id": "chatgpt",
+    "name": "ChatGPT",
+    "maker": "OpenAI",
+    "group": "AI image tools",
+    "summary": "A general AI assistant: useful for writing, research summaries and checking your reasoning.",
+    "bestFor": ["Tightening a concept statement", "Preparing for jury questions", "Summarising long documents"],
+    "shortcuts": [],
+    "tips": [
+      "Give it context first: project type, site, climate, and what you have decided so far.",
+      "Ask it to play a critical juror and question your concept; answer out loud as practice.",
+      "Always check facts, building codes and dimensions against a real source. It can be confidently wrong."
+    ],
+    "withArchHub": "Download the concept summary as text from the Concept Planner and paste it in as context.",
+    "site": "https://chatgpt.com"
+  }
+]

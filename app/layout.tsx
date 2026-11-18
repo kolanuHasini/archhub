@@ -1,7 +1,12 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Newsreader } from "next/font/google";
-import Link from "next/link";
 import "./globals.css";
+
+// The outermost frame shared by every page: fonts, colours and the theme.
+// The page furniture lives one level down:
+//   app/(site)       the public home page, with its header and footer
+//   app/(workspace)  the dashboard and tools, inside the sidebar shell
+//   app/studio       the full-screen drawing studio
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -22,18 +27,16 @@ const newsreader = Newsreader({
 
 export const metadata: Metadata = {
   title: {
-    default: "ArchHub — a free design studio for architects and students",
+    default: "ArchHub — one workspace for architects",
     template: "%s — ArchHub",
   },
   description:
-    "Plan a concept, draw accurate floor plans with layers, floors and curved walls, and build towards a portfolio. Free, in your browser.",
+    "Plan a concept, draw accurate floor plans with layers, floors and curved walls, organise projects and learn your software. Free, in your browser.",
 };
 
-const navLinks = [
-  { href: "/#flow", label: "Workflow" },
-  { href: "/#studio-tools", label: "Tools" },
-  { href: "/#library", label: "Library" },
-];
+// Applies a saved light/dark choice before the page is painted, so there is
+// no flash of the wrong theme.
+const themeScript = `try{var t=localStorage.getItem("archhub.theme");if(t==="light"||t==="dark")document.documentElement.setAttribute("data-theme",t)}catch(e){}`;
 
 export default function RootLayout({
   children,
@@ -43,91 +46,14 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} ${newsreader.variable} h-full antialiased`}
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body className="flex min-h-full flex-col font-sans text-[17px] leading-relaxed">
-        <header className="sticky top-0 z-40 border-b border-ink bg-paper/90 backdrop-blur-md">
-          <div className="mx-auto flex w-full max-w-7xl items-stretch justify-between px-4 sm:px-8">
-            <Link
-              href="/"
-              className="flex items-center py-3.5 font-mono text-lg font-semibold tracking-tight"
-            >
-              Arch<span className="text-accent">Hub</span>
-            </Link>
-            <nav className="hidden items-stretch text-[15px] sm:flex">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className="flex items-center border-l border-line px-6 transition-colors hover:bg-ink hover:text-paper"
-                >
-                  {link.label}
-                </Link>
-              ))}
-              <Link
-                href="/studio/plan"
-                className="flex items-center gap-2 border-x border-ink bg-ink px-6 font-medium text-paper transition-colors hover:bg-accent hover:text-accent-ink"
-              >
-                Open studio
-                <span aria-hidden="true">→</span>
-              </Link>
-            </nav>
-            <Link
-              href="/studio/plan"
-              className="my-2.5 flex items-center bg-ink px-4 text-sm font-medium text-paper sm:hidden"
-            >
-              Open studio →
-            </Link>
-          </div>
-        </header>
-
-        <main className="w-full flex-1">{children}</main>
-
-        <footer className="border-t border-ink">
-          <div className="mx-auto grid w-full max-w-7xl gap-8 px-4 py-12 sm:grid-cols-[1.4fr_1fr_1fr] sm:px-8">
-            <div>
-              <p className="font-mono text-lg font-semibold tracking-tight">
-                Arch<span className="text-accent">Hub</span>
-              </p>
-              <p className="mt-3 max-w-sm text-[15px] text-muted">
-                A free design studio for architects and students. Your work
-                stays in your own browser until you save or share it.
-              </p>
-            </div>
-            <div>
-              <p className="annotation text-muted">Studio</p>
-              <ul className="mt-3 space-y-1.5 text-[15px]">
-                <li>
-                  <Link href="/tools/concept-planner" className="hover:text-accent">
-                    Concept Planner
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/studio/plan" className="hover:text-accent">
-                    Floor Plan Studio
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/tools/scale-converter" className="hover:text-accent">
-                    Scale Converter
-                  </Link>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <p className="annotation text-muted">On this site</p>
-              <ul className="mt-3 space-y-1.5 text-[15px]">
-                {navLinks.map((link) => (
-                  <li key={link.href}>
-                    <Link href={link.href} className="hover:text-accent">
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          </div>
-        </footer>
+        {children}
       </body>
     </html>
   );

@@ -1,29 +1,44 @@
 @import "tailwindcss";
 
 /* ArchHub colours. Change these values to restyle the whole site.
-   (In light mode and in dark mode: there are two lists below.) */
+   There are two lists: light and dark. The theme switch in the top bar sets
+   data-theme on the page; with no choice made, the device setting is used. */
 :root {
-  --paper: #f3f2ee; /* page background */
-  --surface: #ffffff; /* cards */
-  --ink: #0d0d0e; /* main text */
-  --muted: #55554f; /* secondary text */
-  --line: #dcdad2; /* thin borders */
-  --grid: rgba(13, 13, 14, 0.055); /* drafting grid */
-  --accent: #1f4fd8; /* blueprint blue */
-  --accent-ink: #ffffff; /* text on blue */
+  --paper: #ffffff; /* page background: pure white */
+  --surface: #f6f6f6; /* panels and cards: soft grey */
+  --ink: #1f1f1f; /* text: charcoal */
+  --muted: #666663; /* secondary text */
+  --line: #e4e4e1; /* thin borders */
+  --grid: rgba(31, 31, 31, 0.05); /* drafting grid */
+  --accent: #b65e3c; /* highlight: muted terracotta */
+  --accent-ink: #ffffff; /* text on terracotta */
+  --success: #7e9a7a; /* sage green */
 }
 
 @media (prefers-color-scheme: dark) {
-  :root {
-    --paper: #0c0d0f;
-    --surface: #15171a;
-    --ink: #f1f1ee;
-    --muted: #a8a8a1;
-    --line: #2a2c30;
+  :root:not([data-theme="light"]) {
+    --paper: #141414;
+    --surface: #1c1c1c;
+    --ink: #f2f2ef;
+    --muted: #a3a39e;
+    --line: #2c2c2a;
     --grid: rgba(255, 255, 255, 0.05);
-    --accent: #7ea2ff;
-    --accent-ink: #0c0d0f;
+    --accent: #d17e5b;
+    --accent-ink: #141414;
+    --success: #94b08f;
   }
+}
+
+:root[data-theme="dark"] {
+  --paper: #141414;
+  --surface: #1c1c1c;
+  --ink: #f2f2ef;
+  --muted: #a3a39e;
+  --line: #2c2c2a;
+  --grid: rgba(255, 255, 255, 0.05);
+  --accent: #d17e5b;
+  --accent-ink: #141414;
+  --success: #94b08f;
 }
 
 @theme inline {
@@ -34,6 +49,7 @@
   --color-line: var(--line);
   --color-accent: var(--accent);
   --color-accent-ink: var(--accent-ink);
+  --color-success: var(--success);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --font-serif: var(--font-newsreader);

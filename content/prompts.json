@@ -1,0 +1,107 @@
+{
+  "groups": [
+    {
+      "id": "style",
+      "title": "Architectural language",
+      "pick": "one",
+      "options": [
+        "contemporary minimalist",
+        "tropical modernist",
+        "brutalist concrete",
+        "vernacular, built with local craft",
+        "parametric, flowing forms",
+        "Scandinavian timber",
+        "industrial, exposed steel",
+        "biophilic, wrapped in planting"
+      ]
+    },
+    {
+      "id": "materials",
+      "title": "Materials",
+      "pick": "many",
+      "options": [
+        "exposed brick",
+        "board-marked concrete",
+        "warm timber cladding",
+        "rammed earth",
+        "local stone",
+        "perforated brick screens (jali)",
+        "large glazing",
+        "weathering steel",
+        "white lime plaster",
+        "bamboo"
+      ]
+    },
+    {
+      "id": "setting",
+      "title": "Setting",
+      "pick": "one",
+      "options": [
+        "on a quiet residential street",
+        "in a dense city centre",
+        "on a hillside with a long view",
+        "beside a lake",
+        "in a forest clearing",
+        "in a dry, rocky landscape",
+        "on a tropical coast",
+        "around a shaded courtyard"
+      ]
+    },
+    {
+      "id": "light",
+      "title": "Light and weather",
+      "pick": "one",
+      "options": [
+        "soft morning light",
+        "golden hour, long shadows",
+        "overcast, even light",
+        "blue hour with warm interior lights",
+        "after rain, wet reflective ground",
+        "harsh midday sun, deep shade",
+        "misty and quiet"
+      ]
+    },
+    {
+      "id": "view",
+      "title": "Viewpoint",
+      "pick": "one",
+      "options": [
+        "eye-level street view",
+        "three-quarter exterior view",
+        "aerial view from above",
+        "interior looking out",
+        "close-up of a facade detail",
+        "flat front elevation",
+        "section perspective"
+      ]
+    },
+    {
+      "id": "look",
+      "title": "Image style",
+      "pick": "one",
+      "options": [
+        "architectural photography, 35mm lens",
+        "photorealistic render",
+        "collage elevation with flat textures and cut-out trees",
+        "watercolour and ink sketch",
+        "hand-drawn pencil perspective",
+        "physical model, white card, studio lighting",
+        "soft pastel illustration"
+      ]
+    },
+    {
+      "id": "life",
+      "title": "Life in the scene",
+      "pick": "many",
+      "options": [
+        "a few people for scale",
+        "mature trees",
+        "climbing plants on the facade",
+        "birds in the sky",
+        "a bicycle leaning on the wall",
+        "no cars"
+      ]
+    }
+  ],
+  "negative": "blurry, distorted geometry, warped lines, extra windows, text, watermark, logo, oversaturated, cartoon"
+}

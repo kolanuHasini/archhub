@@ -11,12 +11,12 @@ export const metadata: Metadata = {
 
 export default function ScaleConverterPage() {
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-8 sm:py-14">
+    <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-8 sm:py-10">
       <Link
-        href="/#studio-tools"
+        href="/dashboard"
         className="annotation text-accent hover:underline"
       >
-        ← Studio Tools
+        ← Home
       </Link>
       <h1 className="display mt-5 text-5xl sm:text-7xl">
         Scale Converter
